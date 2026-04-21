@@ -1,10 +1,7 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
     Author: Fabian Schmieder
-*/
-/*
-    Copyright (C) 2026, The AROS Development Team. All rights reserved.
-    Author: Fabian Schmieder
+
     m68kemu.library — Moira CPU subclass
 */
 #include <aros/debug.h>

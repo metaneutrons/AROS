@@ -1,10 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
     Author: Fabian Schmieder
-*/
-/*
-    Copyright (C) 2026, The AROS Development Team. All rights reserved.
-    Author: Fabian Schmieder
 
     m68kemu.library — thunk dispatch table
 */
