@@ -31,7 +31,17 @@
 #endif
 
 /* Size of the input device's stack */
-#define IDTASK_STACKSIZE    	    (AROS_STACKSIZE + 10240)
+#if defined(__aarch64__)
+/*
+ * AArch64 needs a larger stack: 64-bit registers double frame sizes,
+ * and the deeper call chains through Intuition/Zune event handling
+ * (input → Intuition → BOOPSI → Zune → application) overflow the
+ * default stack on this architecture.
+ */
+#define IDTASK_STACKSIZE            (AROS_STACKSIZE * 4)
+#else
+#define IDTASK_STACKSIZE            (AROS_STACKSIZE + 10240)
+#endif
 
 /* Priority of the input.device task */
 #define IDTASK_PRIORITY     	    20

@@ -132,6 +132,21 @@ void __dos_Boot(struct DosLibrary *DOSBase, ULONG BootFlags, UBYTE Flags)
 
     D(bug("[DOS] %s: preparing console\n", __func__);)
 
+    /*
+     * Open the Workbench screen before the boot console so the
+     * CON: handler opens its window on the WB screen. This is
+     * essential on single-framebuffer displays (e.g. Raspberry Pi)
+     * and harmless on multi-screen systems.
+     */
+    {
+        struct Library *IntuitionBase = TaggedOpenLibrary(TAGGEDOPEN_INTUITION);
+        if (IntuitionBase) {
+            AROS_LC0(IPTR, OpenWorkBench,
+                     struct Library *, IntuitionBase, 35, Intuition);
+            CloseLibrary(IntuitionBase);
+        }
+    }
+
     if (BootFlags & BF_EMERGENCY_CONSOLE) {
         D(bug("[DOS] %s:     (emergency console)\n", __func__);)
         BootFlags |= BF_NO_STARTUP_SEQUENCE;

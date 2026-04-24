@@ -28,6 +28,7 @@
 
 #include <proto/exec.h>
 #include <proto/expansion.h>
+#include <proto/intuition.h>
 #include <proto/partition.h>
 #include <proto/bootloader.h>
 
@@ -299,7 +300,28 @@ int dosboot_Init(LIBBASETYPEPTR LIBBASE)
         dosboot_BootStrap(LIBBASE);
 
         if (!LIBBASE->bm_Screen)
-            LIBBASE->bm_Screen = NoBootMediaScreen(LIBBASE);
+        {
+            /*
+             * Only open the "no boot media" screen if there is no
+             * Workbench screen already open. On single-framebuffer
+             * displays (e.g. Raspberry Pi), opening a second screen
+             * would corrupt the existing one.
+             */
+            BOOL haveWB = FALSE;
+            struct Library *ib = TaggedOpenLibrary(TAGGEDOPEN_INTUITION);
+            if (ib)
+            {
+                struct Screen *wbscr = LockPubScreen("Workbench");
+                if (wbscr)
+                {
+                    UnlockPubScreen(NULL, wbscr);
+                    haveWB = TRUE;
+                }
+                CloseLibrary(ib);
+            }
+            if (!haveWB)
+                LIBBASE->bm_Screen = NoBootMediaScreen(LIBBASE);
+        }
 
         D(bug("No bootable disk was found.\n"));
         D(bug("Please insert a bootable disk in any drive.\n"));

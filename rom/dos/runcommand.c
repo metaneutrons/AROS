@@ -96,6 +96,14 @@
             archsuitable = TRUE;
     }
 
+    /*
+     * If no ELF info is available (e.g. ROM-resident commands),
+     * we cannot verify the architecture. Assume suitable — the
+     * code is already loaded and linked on this CPU.
+     */
+    if (!elfinfo)
+        archsuitable = TRUE;
+
     if (!archsuitable)
     {
 #if (0)
