@@ -2233,7 +2233,7 @@ IPTR IconList__MUIM_IconList_PositionIcons(struct IClass *CLASS, Object *obj, st
     }
 
 
-    DoMethod(obj, MUIM_IconList_RethinkDimensions, NULL);
+    DoMethod(obj, MUIM_IconList_RethinkDimensions, (IPTR)NULL);
     return (IPTR)NULL;
 }
 ///
@@ -3666,7 +3666,7 @@ IPTR IconList__MUIM_Draw(struct IClass *CLASS, Object *obj, struct MUIP_Draw *me
                         0);
                     
                     entry->ie_Flags |= ICONENTRY_FLAG_NEEDSUPDATE;
-                    DoMethod(obj, MUIM_IconList_DrawEntry, data->update_entry, index);
+                    DoMethod(obj, MUIM_IconList_DrawEntry, data->update_entry, (IPTR)index);
                     entry->ie_Flags &= ~ICONENTRY_FLAG_NEEDSUPDATE;
                     data->icld_UpdateMode = 0;
                     data->update_entry = NULL;
@@ -3747,16 +3747,16 @@ IPTR IconList__MUIM_Draw(struct IClass *CLASS, Object *obj, struct MUIP_Draw *me
                         {
                             // Update entry here
                             entry->ie_Flags |= ICONENTRY_FLAG_NEEDSUPDATE;
-                            DoMethod(obj, MUIM_IconList_DrawEntry, entry, ICONENTRY_DRAWMODE_PLAIN);
-                            DoMethod(obj, MUIM_IconList_DrawEntryLabel, entry, ICONENTRY_DRAWMODE_PLAIN);
+                            DoMethod(obj, MUIM_IconList_DrawEntry, entry, (IPTR)ICONENTRY_DRAWMODE_PLAIN);
+                            DoMethod(obj, MUIM_IconList_DrawEntryLabel, entry, (IPTR)ICONENTRY_DRAWMODE_PLAIN);
                             entry->ie_Flags &= ~ICONENTRY_FLAG_NEEDSUPDATE;
                         }
                     }
                 }
 
                 entry->ie_Flags |= ICONENTRY_FLAG_NEEDSUPDATE;
-                DoMethod(obj, MUIM_IconList_DrawEntry, data->update_entry, ICONENTRY_DRAWMODE_PLAIN);
-                DoMethod(obj, MUIM_IconList_DrawEntryLabel, data->update_entry, ICONENTRY_DRAWMODE_PLAIN);
+                DoMethod(obj, MUIM_IconList_DrawEntry, data->update_entry, (IPTR)ICONENTRY_DRAWMODE_PLAIN);
+                DoMethod(obj, MUIM_IconList_DrawEntryLabel, data->update_entry, (IPTR)ICONENTRY_DRAWMODE_PLAIN);
                 entry->ie_Flags &= ~ICONENTRY_FLAG_NEEDSUPDATE;
                 data->icld_UpdateMode = 0;
                 data->update_entry = NULL;
@@ -4166,7 +4166,7 @@ IPTR IconList__MUIM_Draw(struct IClass *CLASS, Object *obj, struct MUIP_Draw *me
                 {
                     if ((current >= first) && (current <= (first + visible)))
                     {
-                        DoMethod(obj, MUIM_IconList_DrawEntry, entry, current);
+                        DoMethod(obj, MUIM_IconList_DrawEntry, entry, (IPTR)current);
                     }
                     current++;
                 }
@@ -4188,8 +4188,8 @@ IPTR IconList__MUIM_Draw(struct IClass *CLASS, Object *obj, struct MUIP_Draw *me
 
                     if (RectAndRect(&viewrect, &iconrect))
                     {
-                        DoMethod(obj, MUIM_IconList_DrawEntry, entry, ICONENTRY_DRAWMODE_PLAIN);
-                        DoMethod(obj, MUIM_IconList_DrawEntryLabel, entry, ICONENTRY_DRAWMODE_PLAIN);
+                        DoMethod(obj, MUIM_IconList_DrawEntry, entry, (IPTR)ICONENTRY_DRAWMODE_PLAIN);
+                        DoMethod(obj, MUIM_IconList_DrawEntryLabel, entry, (IPTR)ICONENTRY_DRAWMODE_PLAIN);
                     }
                 }
             }
@@ -6335,7 +6335,7 @@ IPTR IconList__MUIM_HandleEvent(struct IClass *CLASS, Object *obj, struct MUIP_H
                         /* Pass view relative coords */
                         touch_x = move_x + data->icld_ViewX;
                         touch_y = move_y + data->icld_ViewY;
-                        DoMethod(obj,MUIM_DoDrag, touch_x, touch_y, 0);
+                        DoMethod(obj,MUIM_DoDrag, (IPTR)touch_x, (IPTR)touch_y, (IPTR)0);
                     }
                     else if (data->icld_LassoActive == TRUE)
                     {

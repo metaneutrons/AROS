@@ -69,16 +69,20 @@ FILES += \
         crc32_simd \
         crc32_512_simd \
         crc_folding
+        contrib/optimizations/inffast_chunk \
+        contrib/optimizations/inflate
 LIBZ_HAVE_SIMD=yes
 endif
 
 ifneq (,$(findstring aarch64,$(AROS_TARGET_CPU)))
+OPTIMIZATION_CFLAGS := -O2
 LIBZ_CPPFLAGS +=-DINFLATE_CHUNK_SIMD_NEON
 LIBZ_CPPFLAGS +=-DADLER32_SIMD_NEON
 LIBZ_CPPFLAGS +=-DINFLATE_CHUNK_READ_64LE
 LIBZ_CPPFLAGS +=-DDEFLATE_CHUNK_WRITE_64LE
 LIBZ_CPPFLAGS +=-DCRC32_ARMV8_CRC32
 LIBZ_CPPFLAGS +=-DDEFLATE_SLIDE_HASH_NEON
+LIBZ_CPPFLAGS +=-DARMV8_OS_AROS
 FILES += \
         adler32_simd \
         contrib/optimizations/inffast_chunk \
