@@ -1,0 +1,125 @@
+include $(SRCDIR)/config/aros.cfg
+
+TARGETDIR       := $(GENDIR)/$(CURDIR)
+FILES           := boot mmu support serialdebug elf devicetree
+ASMFILES        := startup64
+USER_CFLAGS     := -Wall -ffreestanding $(CFLAGS_NO_BUILTIN) -mno-strict-align
+USER_CPPFLAGS   := -DTARGET_SECTION_COMMENT=\"$(AROS_SECTION_COMMENT)\"
+USER_INCLUDES   := -isystem $(SRCDIR)/$(CURDIR)/include -I$(SRCDIR)/rom/openfirmware
+USER_AFLAGS     := -I$(GENINCDIR)
+OPTIMIZATION_CFLAGS := -O2
+
+BOOTSTRAP_LD := $(CROSSTOOLSDIR)/aarch64-aros-ld
+
+#MM kernel-raspi-aarch64 : kernel-raspi-aarch64-bootimg kernel-package-raspi-aarch64
+#MM kernel-raspi-aarch64-bootimg : includes kernel-raspi-aarch64-core
+
+kernel-raspi-aarch64:
+	@$(NOP)
+
+#MM
+kernel-raspi-aarch64-bootimg: $(AROSDIR)/aros-aarch64-raspi.img
+
+# Check if core.elf exists; if not, create a minimal stub
+CORE_ELF := $(OSGENDIR)/boot/core.elf
+
+$(TARGETDIR)/core.bin.o: $(CORE_ELF)
+	@$(ECHO) "Embedding  core.elf (aligned)"
+	@printf '.section .rodata\n.balign 8\n.global _binary_core_bin_start\n_binary_core_bin_start:\n.incbin "%s"\n.global _binary_core_bin_end\n_binary_core_bin_end:\n' $< > $(TARGETDIR)/core_embed.S
+	@$(TARGET_CC) -c $(TARGETDIR)/core_embed.S -o $@
+
+$(AROSDIR)/aros-aarch64-raspi.img: $(TARGETDIR)/core.bin.o $(foreach f, $(ASMFILES), $(TARGETDIR)/$(f).o) $(foreach f, $(FILES), $(TARGETDIR)/$(f).o)
+	@$(ECHO) "Creating   $@"
+	@$(MKDIR) $(dir $@)
+	@$(BOOTSTRAP_LD) -Map $(OSGENDIR)/boot/aros-aarch64-raspi.img.map \
+		--entry=_start --script=$(SRCDIR)/$(CURDIR)/ldscript.lds \
+		$(foreach f, $(ASMFILES), $(TARGETDIR)/$(f).o) \
+		$(foreach f, $(FILES), $(TARGETDIR)/$(f).o) \
+		$(TARGETDIR)/core.bin.o \
+		-L$(AROS_LIB) -lstdc.static \
+		-o $(OSGENDIR)/boot/aros-aarch64-raspi.elf
+	@$(TARGET_DEF_STRIP) --strip-unneeded -R .note -R .comment \
+		$(OSGENDIR)/boot/aros-aarch64-raspi.elf
+	@$(TARGET_OBJCOPY) -O binary $(OSGENDIR)/boot/aros-aarch64-raspi.elf $@
+
+$(TARGETDIR)/%.o : %.c
+	%compile_q
+
+$(TARGETDIR)/%.o : %.S
+	%compile_q
+
+$(TARGETDIR)/%.d : %.c
+	%mkdepend_q
+
+DEPS := $(foreach f, $(FILES), $(TARGETDIR)/$(f).d)
+-include $(DEPS)
+
+# --- BSP ROM Package ---
+
+AARCH64_BSP := aros-$(AROS_TARGET_CPU)-bsp.rom
+
+PKG_LIBS      := aros partition utility oop graphics layers intuition keymap dos poseidon cgxbootpic
+PKG_LIBS_ARCH := expansion
+PKG_RSRC      := misc bootloader dosboot lddemon usbromstartup FileSystem shell shellcommands mbox
+PKG_RSRC_ARCH := processor
+PKG_DEVS      := input gameport keyboard console sdcard USBHardware/usb2otg
+PKG_DEVS_ARCH := timer
+PKG_HANDLERS  := con ram fat sfs afs
+PKG_HIDDS     := gfx inputclass mouse keyboard hiddclass vc4gfx
+PKG_CLASSES   := USB/hid USB/hub USB/bootmouse USB/bootkeyboard USB/massstorage
+
+#MM kernel-package-raspi-aarch64 : \
+#MM kernel-dos \
+#MM kernel-bootloader \
+#MM kernel-debug \
+#MM kernel-dosboot \
+#MM kernel-oop \
+#MM kernel-utility \
+#MM kernel-expansion \
+#MM kernel-openfirmware \
+#MM kernel-cgxbootpic \
+#MM kernel-graphics \
+#MM kernel-intuition \
+#MM kernel-partition \
+#MM kernel-layers \
+#MM kernel-timer \
+#MM kernel-lddemon \
+#MM kernel-hidd \
+#MM kernel-aros \
+#MM kernel-misc \
+#MM kernel-keymap \
+#MM kernel-input \
+#MM kernel-gameport \
+#MM kernel-keyboard \
+#MM kernel-console \
+#MM kernel-shell \
+#MM kernel-shellcommands \
+#MM kernel-filesystem \
+#MM kernel-fs-con \
+#MM kernel-fs-fat \
+#MM kernel-fs-sfs \
+#MM kernel-fs-afs \
+#MM kernel-fs-ram \
+#MM kernel-processor \
+#MM kernel-mbox-bcm2711 \
+#MM kernel-sdcard \
+#MM kernel-hidd-gfx \
+#MM kernel-hidd-input \
+#MM hidd-vc4gfx-bcm2711 \
+#MM kernel-hidd-kbd \
+#MM kernel-hidd-mouse \
+#MM kernel-usb-poseidon \
+#MM kernel-usb-nopci \
+#MM kernel-usb-usb2otg-aarch64 \
+#MM kernel-usb-romstrap-raspi \
+#MM kernel-econsole
+
+%make_package mmake=kernel-package-raspi-aarch64 file=$(AROSDIR)/$(AARCH64_BSP) \
+    libs=$(PKG_LIBS) arch_libs=$(PKG_LIBS_ARCH) res=$(PKG_RSRC) \
+    arch_res=$(PKG_RSRC_ARCH) devs=$(PKG_DEVS) arch_devs=$(PKG_DEVS_ARCH) \
+    handlers=$(PKG_HANDLERS) hidds=$(PKG_HIDDS) classes=$(PKG_CLASSES)
+
+$(AROSDIR)/config.txt: $(AROSDIR)/$(AARCH64_BSP)
+	@printf "kernel=aros-$(AROS_TARGET_CPU)-raspi.img\ninitramfs $(AARCH64_BSP) 0x00800000" > $@
+
+%common
