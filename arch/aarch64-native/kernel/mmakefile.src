@@ -1,0 +1,84 @@
+include $(SRCDIR)/config/aros.cfg
+
+%set_archincludes mainmmake=kernel-kernel maindir=rom/kernel \
+  modname=kernel pri=0 arch=raspi-aarch64 \
+  includes="-I$(SRCDIR)/$(CURDIR)"
+
+%get_archincludes modname=kernel \
+    includeflag=TARGET_KERNEL_INCLUDES maindir=rom/kernel
+
+%get_archincludes modname=exec \
+    includeflag=TARGET_EXEC_INCLUDES maindir=rom/exec
+
+PRIV_KERNEL_INCLUDES = \
+    $(TARGET_KERNEL_INCLUDES) \
+    -I$(SRCDIR)/rom/kernel \
+    $(TARGET_EXEC_INCLUDES) \
+    -I$(SRCDIR)/rom/exec
+
+TARGETDIR := $(GENDIR)/$(CURDIR)
+
+# Arch-specific kernel files compiled into kernel.resource kobj
+CFILES := \
+    kernel_cstart \
+    kernel_startup \
+    platform_init \
+    platform_bcm2711 \
+    gic400 \
+    timer \
+    vc_fb \
+    font8x14 \
+    getsystemattr \
+    kernel_debug \
+    cli \
+    sti \
+    issuper \
+    switch \
+    schedule \
+    dispatch \
+    kernel_syscall \
+    kernel_cpu \
+    kernel_scheduler \
+    smp \
+    spinlock \
+    spinunlock \
+    spininit \
+    tags \
+    cpu_init
+
+AFILES := intvecs smp_entry
+
+
+# core.elf: links kernel.resource, exec.library, task.resource kobjs.
+# kernel_cstart.c and intvecs.S are compiled into kernel_resource.o
+# via %build_archspecific, so we don't link them separately.
+
+#MM kernel-raspi-aarch64-core : kernel-kernel-kobj kernel-exec-kobj kernel-task-kobj
+#MM kernel-raspi-aarch64-core-quick : kernel-kernel-kobj-quick kernel-exec-kobj-quick kernel-task-kobj-quick
+
+#MM
+kernel-raspi-aarch64-core: $(OSGENDIR)/boot/core.elf
+
+$(OSGENDIR)/boot/core.elf: $(KOBJSDIR)/kernel_resource.o $(KOBJSDIR)/exec_library.o $(KOBJSDIR)/task_resource.o
+	@$(ECHO) "Creating   $@"
+	%mkdirs_q $(OSGENDIR)/boot
+	@$(TARGET_LD) -Map $(OSGENDIR)/boot/core.map \
+	    -T $(SRCDIR)/$(CURDIR)/ldscript.lds \
+	    -o $@ $^ \
+	    -L$(AROS_LIB) -larossupport -lautoinit -llibinit -lstdc.static -L$(CROSSTOOLSDIR)/lib/gcc/aarch64-aros/$(TARGET_GCC_VER) -lgcc
+
+KERNEL_CFLAGS := -ffreestanding $(CFLAGS_NO_BUILTIN) \
+    -I$(SRCDIR)/$(CURDIR) \
+    -I$(AROS_DEVELOPER)/include
+
+# Arch-specific files for kernel.resource kobj
+#MM kernel-kernel-raspi-aarch64 : includes
+
+USER_INCLUDES := $(PRIV_KERNEL_INCLUDES) -I$(GENINCDIR) -I$(AROS_DEVELOPER)/include
+USER_CPPFLAGS := -DTARGET_SECTION_COMMENT=\"$(AROS_SECTION_COMMENT)\"
+
+%build_archspecific \
+  mainmmake=kernel-kernel modname=kernel maindir=rom/kernel arch=raspi-aarch64 \
+  files="$(CFILES)" asmfiles="$(AFILES)"
+
+%common
