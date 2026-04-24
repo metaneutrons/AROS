@@ -149,6 +149,7 @@
 #define PROCESSORARCH_PPC             2
 #define PROCESSORARCH_X86             3
 #define PROCESSORARCH_ARM             4
+#define PROCESSORARCH_AARCH64         5
 
 /* Endianness */
 #define ENDIANNESS_UNKNOWN            0
