@@ -214,7 +214,7 @@ VOID MakeMask35(UBYTE *imgdata, UBYTE *imgmask, UBYTE transpcolor, LONG imagew, 
 /****************************************************************************************/
 void *malloc(size_t size)
 {
-    return AllocVec(size, MEMF_PUBLIC);
+    return AllocVec(size, MEMF_PUBLIC | MEMF_CLEAR);
 }
 
 void free(void *ptr)
@@ -249,7 +249,9 @@ STATIC BOOL ReadARGB35(struct DiskObject *icon, struct IFFHandle *iff, struct Fi
     argb = AllocMemIcon(icon, size, MEMF_PUBLIC, IconBase);
     if (!argb) goto fail;
  
-    zsize = AROS_BE2WORD(*((UWORD *)(src + 6))) + 1;
+    zsize = (UWORD)AROS_BE2WORD(*((UWORD *)(src + 6)));
+    if (zsize + 10 > (ULONG)chunksize)
+        zsize = chunksize - 10;
     err = uncompress(argb, &size, src + 10, zsize);
     if (err != Z_OK) {
         D(bug("%s: Can't uncompress %d ARGB bytes: %s\n", __func__, zsize, zError(err)));

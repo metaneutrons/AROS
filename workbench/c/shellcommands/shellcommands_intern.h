@@ -22,12 +22,18 @@ struct ShellCommandsBase {
      * We will feed in to DOS/AddSegment() the BPTR to 
      * &sc_Command[i].scs_Next as the 'seglist' to add.
      */
+    /*
+     * AROS segment layout: [ULONG size][BPTR next][code...][name]
+     * DOS expects code immediately after the segment header (size+next).
+     * Packed is required to prevent padding between scs_Next and scs_Code,
+     * since sizeof(ULONG) + sizeof(BPTR) = 12 on 64-bit systems.
+     */
     struct ShellCommandSeg {
-    	ULONG              scs_Size;      /* Length of segment in # of ULONGs */
-    	ULONG              scs_Next;      /* Next segment (always 0 for this) */
-    	struct FullJumpVec scs_Code;      /* Code to jump to shell command */
-    	CONST_STRPTR __attribute__((aligned(4)))  scs_Name;      /* Name of the segment */
-    } *sc_Command;
+    	ULONG              scs_Size;      /* Segment size (0 = don't UnLoadSeg) */
+    	BPTR               scs_Next;      /* Next segment (always 0) */
+    	struct FullJumpVec scs_Code;      /* Jump vector to shell command */
+    	CONST_STRPTR       scs_Name;      /* Command name */
+    } __attribute__((packed)) *sc_Command;
 
     /* Bookkeeping */
     BPTR	sc_SegList;
