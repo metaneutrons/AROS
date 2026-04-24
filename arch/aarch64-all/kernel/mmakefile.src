@@ -1,0 +1,8 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+%set_archincludes mainmmake=kernel-kernel maindir=rom/kernel \
+  modname=kernel pri=5 arch=aarch64 \
+  includes="-I$(SRCDIR)/$(CURDIR)"
+
+%common
