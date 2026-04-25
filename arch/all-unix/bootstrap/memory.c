@@ -14,6 +14,25 @@
 #define MAP_32BIT 0
 #endif
 
+#ifndef MAP_JIT
+#define MAP_JIT 0
+#endif
+
+/*
+ * macOS on Apple Silicon (arm64) enforces W^X: pages cannot be both
+ * writable and executable simultaneously. MAP_JIT allows the OS to
+ * manage per-thread write/execute permissions via
+ * pthread_jit_write_protect_np(). We use MAP_JIT for all RAM
+ * allocations that may contain executable code (FullJumpVec stubs
+ * written by the ELF loader and shell command init).
+ */
+#if defined(HOST_OS_darwin) && defined(__aarch64__)
+#include <pthread.h>
+#define AROS_HOST_MAP_JIT MAP_JIT
+#else
+#define AROS_HOST_MAP_JIT 0
+#endif
+
 static void *data = NULL;
 static void *code = NULL;
 static size_t code_len = 0;
@@ -88,13 +107,13 @@ void *AllocateRW(size_t len)
  */
 void *AllocateRAM32(size_t len)
 {
-    return doMMap(&RAM32, &RAM32_len, len, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED|MAP_32BIT);
+    return doMMap(&RAM32, &RAM32_len, len, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED|MAP_32BIT|AROS_HOST_MAP_JIT);
 }
 
 #if (__WORDSIZE == 64)
 void *AllocateRAM(size_t len)
 {
-    return doMMap(&RAM, &RAM_len, len, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED);
+    return doMMap(&RAM, &RAM_len, len, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED|AROS_HOST_MAP_JIT);
 }
 #endif
 

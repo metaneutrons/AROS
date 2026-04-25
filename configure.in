@@ -1771,6 +1771,22 @@ case "$target_os" in
                 export PATH="$aros_xcode_path/Platforms/$aros_ios_platform.platform/Developer/usr/bin:$PATH"
                 llvm_target_cpu="Arm"
                 ;;
+            *aarch64*|*arm64*)
+                PLATFORM_EXECSMP="#define __AROSPLATFORM_SMP__"
+                aros_target_cpu="aarch64"
+                aros_object_format="aarch64elf_aros"
+                aros_target_mkdep="$aros_target_mkdep -D__GNUC__ -Daarch64"
+                aros_macosx_version="11.0"
+                aros_config_cflags="$aros_config_cflags $""(CFLAGS_NO_OMIT_FP)"
+                aros_config_cxxflags="$aros_config_cxxflags $""(CFLAGS_NO_OMIT_FP)"
+                aros_kernel_isa_flags=""
+                aros_kernel_ldflags=""
+                aros_nominal_depth=8
+                aros_kernel_ar_flags="-cr"
+                aros_target_strip_flags="-x"
+                gcc_target_cpu="aarch64"
+                llvm_target_cpu="AArch64"
+                ;;
             *)
                 AC_MSG_ERROR("Unsupported target CPU for darwin hosted flavour -- $target_cpu")
                 ;;

@@ -95,10 +95,36 @@ struct FullJumpVec
 do \
 {  \
     struct FullJumpVec *_v = (v); \
+    AROS_BEGIN_CODE_WRITE();                                    \
     _v->jmp[0] = 0x58000050;   /* ldr x16, .+8             */  \
     _v->jmp[1] = 0xd61f0200;   /* br  x16                  */  \
     _v->vec    = (unsigned long)(a); /* 64-bit target address */  \
+    AROS_END_CODE_WRITE();                                      \
 } while (0)
+
+/*
+ * W^X support macros for macOS arm64 (Apple Silicon).
+ *
+ * macOS enforces that MAP_JIT pages can only be writable OR executable
+ * at any given time per thread. pthread_jit_write_protect_np(false)
+ * makes them writable; pthread_jit_write_protect_np(true) makes them
+ * executable again. sys_icache_invalidate() is needed after writing
+ * instructions to ensure the icache sees the new code.
+ *
+ * On all other platforms these are no-ops.
+ */
+#if defined(HOST_OS_darwin) && defined(__aarch64__)
+#include <pthread.h>
+#include <libkern/OSCacheControl.h>
+#define AROS_BEGIN_CODE_WRITE()  pthread_jit_write_protect_np(0)
+#define AROS_END_CODE_WRITE()    do { \
+    pthread_jit_write_protect_np(1); \
+    sys_icache_invalidate((void *)_v, sizeof(struct FullJumpVec)); \
+} while (0)
+#else
+#define AROS_BEGIN_CODE_WRITE()  do { } while (0)
+#define AROS_END_CODE_WRITE()    do { } while (0)
+#endif
 
 struct JumpVec
 {
