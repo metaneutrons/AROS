@@ -264,7 +264,9 @@
     if(ret == DD_OK) {
         OOP_Object *gfxhidd = HW_AddDriver(PrivGBase(GfxBase)->GfxRoot, gfxclass, (struct TagItem *)attrs);
 
+        bug("[AddDisplayDriverA] HW_AddDriver returned %p\n", gfxhidd);
         if(gfxhidd) {
+            bug("[AddDisplayDriverA] Calling driver_Setup...\n");
             D(bug("[AddDisplayDriverA] Installing driver\n"));
 
             /* Attach system structures to the driver */

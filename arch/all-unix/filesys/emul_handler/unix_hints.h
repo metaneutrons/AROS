@@ -29,10 +29,13 @@
 #else
 
 /*
- * Use 32-bit inode_t on Darwin. Otherwise we are expected to use "stat$INODE64"
+ * Use 32-bit inode_t on Darwin x86. Otherwise we are expected to use "stat$INODE64"
  * instead of "stat" function which is available only on MacOS 10.6.
+ * On arm64 Darwin, only 64-bit inodes are available, so we must not define this.
  */
+#if !defined(__aarch64__) && !defined(__arm64__)
 #define _DARWIN_NO_64_BIT_INODE
+#endif
 #endif
 
 #ifdef HOST_OS_darwin

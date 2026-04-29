@@ -40,6 +40,14 @@ AROS_LH3(IPTR, NewStackSwap,
     }
 
     D(bug("[NewStackSwap] SP 0x%p, entry point 0x%p\n", sp, entry));
+
+    if (!entry)
+    {
+        bug("[NewStackSwap] ERROR: NULL entry point! Caller LR=%p\n",
+            __builtin_return_address(0));
+        return 0;
+    }
+
     Disable();
 
     /* Change limits */

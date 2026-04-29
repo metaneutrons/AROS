@@ -196,16 +196,19 @@ struct monitor_driverdata *driver_Setup(OOP_Object *gfxhidd, struct GfxBase *Gfx
 
     D(bug("[driver_Setup] gfxhidd=0x%p (%s)\n", gfxhidd, OOP_OCLASS(gfxhidd)->ClassNode.ln_Name));
 
+    bug("[driver_Setup] calling QueryModeIDs on %p\n", gfxhidd);
     modes = HIDD_Gfx_QueryModeIDs(gfxhidd, NULL);
+    bug("[driver_Setup] QueryModeIDs returned %p\n", modes);
     if(!modes)
         return NULL;
 
     /* Count number of display modes */
     for(m = modes; *m != vHidd_ModeID_Invalid; m ++)
         cnt++;
+    bug("[driver_Setup] cnt=%d\n", cnt);
 
     mdd = AllocVec(sizeof(struct monitor_driverdata) + cnt * sizeof(struct DisplayInfoHandle), MEMF_PUBLIC | MEMF_CLEAR);
-    D(bug("[driver_Setup] Allocated driverdata at 0x%p\n", mdd));
+    bug("[driver_Setup] mdd=%p\n", mdd);
     if(!mdd) {
         HIDD_Gfx_ReleaseModeIDs(gfxhidd, modes);
         return NULL;
@@ -226,6 +229,7 @@ struct monitor_driverdata *driver_Setup(OOP_Object *gfxhidd, struct GfxBase *Gfx
 
         /* Watch out! The last record in the array is terminator (vHidd_ModeID_Invalid) */
         if((i < cnt) && (!compose)) {
+            bug("[driver_Setup] ModeProperties i=%d mode=0x%x\n", i, modes[i]);
             HIDD_Gfx_ModeProperties(gfxhidd, modes[i], &props, sizeof(props));
             compose |= props.CompositionFlags;
 
@@ -249,20 +253,24 @@ struct monitor_driverdata *driver_Setup(OOP_Object *gfxhidd, struct GfxBase *Gfx
     }
 
     HIDD_Gfx_ReleaseModeIDs(gfxhidd, modes);
+    bug("[driver_Setup] after ReleaseModeIDs\n");
 
     /* Query properties of our driver */
 #ifndef FORCE_SOFTWARE_SPRITE
     OOP_GetAttr(gfxhidd, aHidd_Gfx_HWSpriteTypes, &hwcursor);
+    bug("[driver_Setup] hwcursor=%d\n", (int)hwcursor);
 #endif
     OOP_GetAttr(gfxhidd, aHidd_Gfx_FrameBufferType, &fbtype);
+    bug("[driver_Setup] fbtype=%d hwcursor=%d\n", (int)fbtype, (int)hwcursor);
 
     if(hwcursor) {
         mdd->gfxhidd = gfxhidd;
     } else {
         D(bug("[driver_Setup] Hardware mouse cursor is not supported, using fakegfx.hidd\n"));
 
+        bug("[driver_Setup] calling init_fakegfxhidd\n");
         mdd->gfxhidd = init_fakegfxhidd(gfxhidd, GfxBase);
-        if(mdd->gfxhidd)
+        bug("[driver_Setup] init_fakegfxhidd returned %p\n", mdd->gfxhidd);        if(mdd->gfxhidd)
             mdd->flags |= DF_UseFakeGfx;
         else
             ok = FALSE;
@@ -281,7 +289,9 @@ struct monitor_driverdata *driver_Setup(OOP_Object *gfxhidd, struct GfxBase *Gfx
             mdd->flags |= DF_DirectFB;
 
         case vHidd_FrameBuffer_Mirrored:
+            bug("[driver_Setup] creating framebuffer\n");
             mdd->framebuffer = create_framebuffer(mdd, GfxBase);
+            bug("[driver_Setup] framebuffer=%p\n", mdd->framebuffer);
             break;
         }
 

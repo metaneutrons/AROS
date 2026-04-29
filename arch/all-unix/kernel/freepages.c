@@ -1,9 +1,10 @@
 /*
-    Copyright (C) 1995-2014, The AROS Development Team. All rights reserved.
+    Copyright (C) 1995-2026, The AROS Development Team. All rights reserved.
+
+    Desc: KrnFreePages for unix-hosted — uses munmap.
 */
 
 #include <aros/libcall.h>
-
 #include <inttypes.h>
 
 #include <kernel_base.h>
@@ -16,7 +17,7 @@ AROS_LH2(void, KrnFreePages,
 {
     AROS_LIBFUNC_INIT
 
-    KernelIFace.munmap(phy_addr, length);
+    KernelBase->kb_PlatformData->iface->munmap(phy_addr, length);
     AROS_HOST_BARRIER
 
     AROS_LIBFUNC_EXIT

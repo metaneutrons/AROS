@@ -312,6 +312,15 @@ static BOOL ifmeta_allocdisptabs(OOP_Class *cl, OOP_Object *o, struct P_meta_all
             {
                 D(bug("[META] Method ID 0x%08X function 0x%p\n", ifdescr->MethodTable[i].MethodIdx, ifdescr->MethodTable[i].MethodFunc));
 
+                /* Sanity check: function pointers should be > 4096 */
+                if ((IPTR)ifdescr->MethodTable[i].MethodFunc < 4096)
+                {
+                    bug("[META] WARNING: Suspicious MethodFunc %p for method %d in interface %s\n",
+                        ifdescr->MethodTable[i].MethodFunc,
+                        ifdescr->MethodTable[i].MethodIdx,
+                        ifdescr->InterfaceID);
+                }
+
                 ifb->MethodTable[ ifdescr->MethodTable[i].MethodIdx ].MethodFunc = (IFMethodFunc_t)ifdescr->MethodTable[i].MethodFunc;
                 ifb->MethodTable[ ifdescr->MethodTable[i].MethodIdx ].mClass     = (OOP_Class *)o;
             } /* for (each method in the interface) */

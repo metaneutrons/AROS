@@ -25,10 +25,19 @@
 #else
 
 /*
- * Use 32-bit inode_t on Darwin. Otherwise we are expected to use "stat$INODE64"
+ * Use 32-bit inode_t on Darwin x86. Otherwise we are expected to use "stat$INODE64"
  * instead of "stat" function which is available only on MacOS 10.6.
+ * On arm64 Darwin, only 64-bit inodes are available, so we must not define this.
  */
+#if !defined(__aarch64__) && !defined(__arm64__)
 #define _DARWIN_NO_64_BIT_INODE
+#endif
+/*
+ * On arm64 Darwin (and iOS), there's no struct stat64. Use struct stat instead.
+ */
+#if defined(__aarch64__) || defined(__arm64__)
+#define stat64 stat
+#endif
 /* This enables struct stat64 definition */
 #define _DARWIN_C_SOURCE        /* For Darwin */
 #define _LARGEFILE64_SOURCE     /* For Linux */

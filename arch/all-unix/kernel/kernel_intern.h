@@ -43,6 +43,9 @@ struct KernelInterface
     int     (*SigAddSet)(sigset_t *set, int signum);
     int     (*SigDelSet)(sigset_t *set, int signum);
 #endif
+#if defined(HOST_OS_darwin) && defined(__aarch64__)
+    void    (*icache_invalidate)(void *start, size_t len);
+#endif
 };
 
 /*

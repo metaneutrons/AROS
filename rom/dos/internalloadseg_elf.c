@@ -10,6 +10,7 @@
 #include <proto/arossupport.h>
 #include <proto/debug.h>
 #include <proto/exec.h>
+#include <proto/kernel.h>
 
 #include <aros/asmcall.h>
 #include <aros/macros.h>
@@ -34,6 +35,13 @@ struct hunk
     BPTR  next;
     char  data[0];
 } __attribute__((packed));
+
+#define HUNKF_EXEC 1
+#define HUNKF_MMAP 2  /* Allocated via KrnAllocPages, not AROS heap */
+#define HUNKF_SHIFT 30 /* Flags stored in high bits of size */
+#define HUNK_SIZE(h) ((h)->size & 0x3FFFFFFFUL)
+#define HUNK_FLAGS(h) ((h)->size >> HUNKF_SHIFT)
+#define HUNK_SET_SIZE_FLAGS(h, sz, fl) ((h)->size = ((sz) & 0x3FFFFFFFUL) | ((fl) << HUNKF_SHIFT))
 
 #define BPTR2HUNK(bptr) ((struct hunk *)((void *)bptr - offsetof(struct hunk, next)))
 #define HUNK2BPTR(hunk) MKBADDR(&hunk->next)
@@ -251,11 +259,56 @@ static int __attribute__ ((noinline)) load_hunk
         }
     }
 
+#if defined(__aarch64__)
+    /*
+     * macOS arm64 W^X: executable hunks must be on their own mmap'd pages.
+     * Allocate an extra page for the hunk header so the code pages can be
+     * mprotect'd to RX without affecting the writable header.
+     */
+    if (sh->flags & SHF_EXECINSTR)
+    {
+        APTR KernelBase = OpenResource("kernel.resource");
+        if (KernelBase)
+        {
+            ULONG pgsz = 16384;
+            /* Header on first page, code on subsequent pages */
+            ULONG alloc_size = pgsz + ((hunk_size + pgsz - 1) & ~(pgsz - 1));
+            hunk = (struct hunk *)KrnAllocPages(NULL, alloc_size, MAP_Readable | MAP_Writable);
+                bug("[ELF] KrnAllocPages(%lu) -> %p\n", (unsigned long)alloc_size, hunk);
+            if (hunk)
+            {
+                if (sh->type == SHT_NOBITS)
+                    memset(hunk, 0, alloc_size);
+                hunk->next = 0;
+                HUNK_SET_SIZE_FLAGS(hunk, alloc_size, HUNKF_MMAP);
+                /* Point data to the second page so code is page-aligned */
+                /* We'll adjust sh->addr later to skip the header page */
+                goto hunk_allocated;
+            }
+        }
+    }
+#endif
     hunk = ilsAllocMem(hunk_size, memflags | MEMF_PUBLIC | (sh->type == SHT_NOBITS ? MEMF_CLEAR : 0));
     if (hunk)
     {
         hunk->next = 0;
-        hunk->size = hunk_size;
+        HUNK_SET_SIZE_FLAGS(hunk, hunk_size, 0);
+hunk_allocated: ;
+
+#if defined(__aarch64__)
+        /* For mmap'd executable hunks, code goes on the second page.
+         * Write a FullJumpVec (data pointer) at hunk->data so that
+         * __AROS_SEG_ENTRY can find the actual code address. */
+        if (HUNK_FLAGS(hunk) & HUNKF_MMAP)
+        {
+            IPTR pgsz = 16384;
+            sh->addr = (char *)(((IPTR)hunk + pgsz) & ~(pgsz - 1));
+            if (do_align && sh->addralign > 1)
+                sh->addr = (char *)AROS_ROUNDUP2((IPTR)sh->addr, sh->addralign);
+            __AROS_SET_FULLJMP((struct FullJumpVec *)hunk->data, sh->addr);
+            goto hunk_addr_set;
+        }
+#endif
 
         /* In case we are required to honour alignment, and If this section contains
            executable code, create a trampoline to its beginning, so that even if the
@@ -265,17 +318,28 @@ static int __attribute__ ((noinline)) load_hunk
         {
             if (sh->flags & SHF_EXECINSTR)
             {
+#if defined(HOST_OS_darwin) && defined(__aarch64__)
+                /*
+                 * macOS arm64 W^X: we cannot write executable code to RAM.
+                 * Skip the FullJumpVec trampoline and point directly to the
+                 * aligned code. The segment entry point is the code itself.
+                 */
+                sh->addr = (char *)AROS_ROUNDUP2((IPTR)hunk->data, sh->addralign);
+#else
                 sh->addr = (char *)AROS_ROUNDUP2
                 (
                     (IPTR)hunk->data + sizeof(struct FullJumpVec), sh->addralign
                 );
                 __AROS_SET_FULLJMP((struct FullJumpVec *)hunk->data, sh->addr);
+#endif
             }
             else
                 sh->addr = (char *)AROS_ROUNDUP2((IPTR)hunk->data, sh->addralign);
         }
         else
             sh->addr = hunk->data;
+
+hunk_addr_set: ;
 
         /* Link the previous one with the new one */
         BPTR2HUNK(*next_hunk_ptr)->next = HUNK2BPTR(hunk);
@@ -1190,7 +1254,27 @@ end:
     {
         struct hunk *hunk = BPTR2HUNK(BADDR(curr));
 
-        ils_ClearCache(hunk->data, hunk->size, CACRF_ClearD | CACRF_ClearI);
+        ils_ClearCache(hunk->data, HUNK_SIZE(hunk), CACRF_ClearD | CACRF_ClearI);
+
+#if defined(__aarch64__)
+        /* macOS arm64 W^X: make mmap'd executable hunks read+execute.
+         * Only mprotect the code portion (hunk->data), not the header. */
+        if (HUNK_FLAGS(hunk) & HUNKF_MMAP)
+        {
+            APTR KernelBase = OpenResource("kernel.resource");
+            if (KernelBase)
+            {
+                /* Code starts on the second page (first page is the header) */
+                IPTR pgsz = 16384;
+                void *code_page = (void *)(((IPTR)hunk + pgsz) & ~(pgsz - 1));
+                IPTR code_len = (IPTR)hunk + HUNK_SIZE(hunk) - (IPTR)code_page;
+                if (code_len > 0)
+                    KrnSetProtection(code_page, code_len,
+                                     MAP_Readable | MAP_Executable);
+            }
+        }
+#endif
+
         curr = hunk->next;
     }
 #endif

@@ -17,5 +17,5 @@ EXEDIR := $(AROSDIR)/Storage/Monitors
 
 %build_prog mmake=kernel-hidd-sdl \
   progname=SDL targetdir=$(EXEDIR) \
-  files=$(FILES) cflags="$(CFLAGS) $(HOST_SDL_CFLAGS)" \
+  files=$(FILES) cflags="$(subst -DHOST_OS_darwin,,$(CFLAGS)) $(HOST_SDL_CFLAGS) -include $(SRCDIR)/$(CURDIR)/sdl_types_fix.h" \
   uselibs="hiddstubs"

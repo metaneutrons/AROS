@@ -55,6 +55,17 @@ DEFINESET(STARTUP);
 /*
  * Kickstart entry point. Note that our code area is already made read-only by the bootstrap.
  */
+
+/* Early debug: write directly to fd 2 (stderr) via host write() — works before HostIFace is set up */
+static void early_puts(const char *s)
+{
+    /* Use the bootstrap's KPutC if HostIFace is available, otherwise try direct write */
+    extern struct HostInterface *HostIFace;
+    if (HostIFace && HostIFace->KPutC) {
+        while (*s) HostIFace->KPutC(*s++);
+    }
+}
+
 int __startup startup(struct TagItem *msg, ULONG magic)
 {
     void* _stack = AROS_GET_SP;
@@ -76,7 +87,10 @@ int __startup startup(struct TagItem *msg, ULONG magic)
 
     /* This bails out if the user started us from within AROS command line, as common executable */
     if (magic != AROS_BOOT_MAGIC)
+    {
+        early_puts("[Kernel] Bad magic\n");
         return -1;
+    }
 
     while ((tag = LibNextTagItem(&tstate)))
     {
@@ -121,16 +135,31 @@ int __startup startup(struct TagItem *msg, ULONG magic)
 
     /* If there's no proper HostIFace, we can't even say anything */
     if (!HostIFace)
+    {
+        early_puts("[Kernel] No HostIFace!\n");
         return -1;
+    }
+
+    early_puts("[Kernel] HostIFace OK, checking architecture...\n");
 
     if (strcmp(HostIFace->System, AROS_ARCHITECTURE))
+    {
+        early_puts("[Kernel] Architecture mismatch: ");
+        early_puts(HostIFace->System);
+        early_puts(" != ");
+        early_puts(AROS_ARCHITECTURE);
+        early_puts("\n");
         return -1;
+    }
 
     if (HostIFace->Version < HOSTINTERFACE_VERSION)
+    {
+        early_puts("[Kernel] HostIFace version too old\n");
         return -1;
+    }
 
     /* Host interface is okay. We have working krnPutC() and can talk now. */
-    D(nbug("[Kernel] Starting up...\n"));
+    early_puts("[Kernel] Starting up...\n");
 
     if ((!ranges[0]) || (!ranges[1]) || (!mmap))
     {
@@ -295,8 +324,11 @@ int __startup startup(struct TagItem *msg, ULONG magic)
     }
 
     /* The following is a typical AROS bootup sequence */
+    nbug("[Kernel] About to call InitCode(RTF_SINGLETASK)...\n");
     InitCode(RTF_SINGLETASK, 0);        /* Initialize early modules. This includes hostlib.resource. */
+    nbug("[Kernel] InitCode(RTF_SINGLETASK) done, calling core_Start...\n");
     core_Start(hostlib);                /* Got hostlib.resource. Initialize our interrupt mechanism. */
+    nbug("[Kernel] core_Start done, calling InitCode(RTF_COLDSTART)...\n");
     InitCode(RTF_COLDSTART, 0);         /* Boot!                                                     */
 
     /* If we returned here, something went wrong, and dos.library failed to take over */

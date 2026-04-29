@@ -220,6 +220,9 @@ int main(void)
             };
 
             xsd.gfxclass = OOP_NewObject(NULL, CLID_HiddMeta, SDLGfx_tags);
+            bug("[SDL] gfxclass=%p ifdescr=%p Root_New=%p\n",
+                xsd.gfxclass, SDLGfx_ifdescr,
+                SDLGfx_ifdescr[0].MethodTable[0].MethodFunc);
             if (xsd.gfxclass) {
                 struct TagItem SDLBitMap_tags[] = {
                     {aMeta_SuperID       , (IPTR)CLID_Hidd_BitMap },

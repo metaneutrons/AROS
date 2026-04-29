@@ -52,12 +52,15 @@ static const SDL_Rect *default_modes[] = {
 OOP_Object *SDLGfx__Root__New(OOP_Class *cl, OOP_Object *o, struct pRoot_New *msg) {
     const SDL_VideoInfo *info;
     const SDL_PixelFormat *pixfmt;
+
+    bug("[sdlgfx] New: entered\n");
 #if DEBUG
     char driver[128] = "";
 #endif
     Uint32 surftype;
     const SDL_Rect **modes;
     struct TagItem *pftags = NULL;
+    struct TagItem pftags_storage[15];
     int nmodes, i;
     APTR tagpool;
     struct TagItem **synctags, *modetags, *msgtags;
@@ -67,14 +70,56 @@ OOP_Object *SDLGfx__Root__New(OOP_Class *cl, OOP_Object *o, struct pRoot_New *ms
     S(SDL_VideoDriverName, driver, sizeof(driver));
     kprintf("sdlgfx: using %s driver\n", driver);
 #endif
+    bug("[sdlgfx] New: SDL_GetVideoInfo func=%p\n", sdl_funcs.SDL_GetVideoInfo);
     info = SP(SDL_GetVideoInfo);
+    bug("[sdlgfx] New: SDL_GetVideoInfo=%p\n", info);
+    if (!info) { bug("[sdlgfx] New: SDL_GetVideoInfo returned NULL!\n"); return NULL; }
+    /* Dump first 32 bytes of info struct */
+    {
+        unsigned char *p = (unsigned char *)info;
+        bug("[sdlgfx] New: info bytes: %02x %02x %02x %02x %02x %02x %02x %02x "
+            "%02x %02x %02x %02x %02x %02x %02x %02x "
+            "%02x %02x %02x %02x %02x %02x %02x %02x\n",
+            p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7],
+            p[8],p[9],p[10],p[11],p[12],p[13],p[14],p[15],
+            p[16],p[17],p[18],p[19],p[20],p[21],p[22],p[23]);
+    }
     pixfmt = info->vfmt;
+    bug("[sdlgfx] New: pixfmt=%p hw=%d wm=%d\n", pixfmt, info->hw_available, info->wm_available);
     D(bug("[sdl] window manager: %savailable\n", info->wm_available ? "" : "not "));
     D(bug("[sdl] hardware surfaces: %savailable\n", info->hw_available ? "" : "not "));
 
     LIBBASE->use_hwsurface = info->hw_available ? TRUE : FALSE;
     surftype = LIBBASE->use_hwsurface ? SDL_HWSURFACE : SDL_SWSURFACE;
 
+    bug("[sdlgfx] New: pixfmt=%p\n", pixfmt);
+#if defined(__aarch64__) && defined(HOST_OS_darwin)
+    /* On macOS arm64 with SDL12-compat, the pixfmt pointer from SDL_GetVideoInfo
+     * may point to freed memory. Use a hardcoded ARGB32 format instead. */
+    {
+        int stdpixfmt = vHidd_StdPixFmt_BGRA32;
+        int alpha_shift = 0, red_shift = 8, green_shift = 16, blue_shift = 24;
+        LIBBASE->use_hwsurface = FALSE;
+        surftype = SDL_SWSURFACE;
+
+        pftags = pftags_storage;
+        pftags_storage[0].ti_Tag = aHidd_PixFmt_ColorModel;    pftags_storage[0].ti_Data = vHidd_ColorModel_TrueColor;
+        pftags_storage[1].ti_Tag = aHidd_PixFmt_RedShift;      pftags_storage[1].ti_Data = red_shift;
+        pftags_storage[2].ti_Tag = aHidd_PixFmt_GreenShift;    pftags_storage[2].ti_Data = green_shift;
+        pftags_storage[3].ti_Tag = aHidd_PixFmt_BlueShift;     pftags_storage[3].ti_Data = blue_shift;
+        pftags_storage[4].ti_Tag = aHidd_PixFmt_AlphaShift;    pftags_storage[4].ti_Data = alpha_shift;
+        pftags_storage[5].ti_Tag = aHidd_PixFmt_RedMask;       pftags_storage[5].ti_Data = 0x00ff0000;
+        pftags_storage[6].ti_Tag = aHidd_PixFmt_GreenMask;     pftags_storage[6].ti_Data = 0x0000ff00;
+        pftags_storage[7].ti_Tag = aHidd_PixFmt_BlueMask;      pftags_storage[7].ti_Data = 0x000000ff;
+        pftags_storage[8].ti_Tag = aHidd_PixFmt_AlphaMask;     pftags_storage[8].ti_Data = 0xff000000;
+        pftags_storage[9].ti_Tag = aHidd_PixFmt_Depth;         pftags_storage[9].ti_Data = 32;
+        pftags_storage[10].ti_Tag = aHidd_PixFmt_BitsPerPixel; pftags_storage[10].ti_Data = 32;
+        pftags_storage[11].ti_Tag = aHidd_PixFmt_BytesPerPixel;pftags_storage[11].ti_Data = 4;
+        pftags_storage[12].ti_Tag = aHidd_PixFmt_StdPixFmt;    pftags_storage[12].ti_Data = stdpixfmt;
+        pftags_storage[13].ti_Tag = aHidd_PixFmt_BitMapType;   pftags_storage[13].ti_Data = vHidd_BitMapType_Chunky;
+        pftags_storage[14].ti_Tag = TAG_DONE;                   pftags_storage[14].ti_Data = 0;
+    }
+#else
     D(bug("[sdl] colour model: %s\n", pixfmt->palette == NULL ? "truecolour" : "palette"));
     if (pixfmt->palette == NULL) {
         D(bug("[sdl] colour mask: alpha=0x%08x red=0x%08x green=0x%08x blue=0x%08x\n", pixfmt->Amask, pixfmt->Rmask, pixfmt->Gmask, pixfmt->Bmask, pixfmt->Amask));
@@ -199,26 +244,31 @@ OOP_Object *SDLGfx__Root__New(OOP_Class *cl, OOP_Object *o, struct pRoot_New *ms
 
         D(bug("[sdl] selected pixel format %d\n", stdpixfmt));
 
-        pftags = TAGLIST(
-            aHidd_PixFmt_ColorModel,    vHidd_ColorModel_TrueColor,
-            aHidd_PixFmt_RedShift,      red_shift,
-            aHidd_PixFmt_GreenShift,    green_shift,
-            aHidd_PixFmt_BlueShift,     blue_shift,
-            aHidd_PixFmt_AlphaShift,    alpha_shift,
-            aHidd_PixFmt_RedMask,       pixfmt->Rmask,
-            aHidd_PixFmt_GreenMask,     pixfmt->Gmask,
-            aHidd_PixFmt_BlueMask,      pixfmt->Bmask,
-            aHidd_PixFmt_AlphaMask,     pixfmt->Amask,
-            aHidd_PixFmt_Depth,         pixfmt->BitsPerPixel,
-            aHidd_PixFmt_BitsPerPixel,  pixfmt->BitsPerPixel,
-            aHidd_PixFmt_BytesPerPixel, pixfmt->BytesPerPixel,
-            aHidd_PixFmt_StdPixFmt,     stdpixfmt,
-            aHidd_PixFmt_BitMapType,    vHidd_BitMapType_Chunky
-        );
+        pftags = pftags_storage;
+        bug("[sdlgfx] pf: R=%08x G=%08x B=%08x A=%08x bpp=%d Bpp=%d std=%d\n",
+            (unsigned)pixfmt->Rmask, (unsigned)pixfmt->Gmask,
+            (unsigned)pixfmt->Bmask, (unsigned)pixfmt->Amask,
+            (int)pixfmt->BitsPerPixel, (int)pixfmt->BytesPerPixel, stdpixfmt);
+        pftags_storage[0].ti_Tag = aHidd_PixFmt_ColorModel;    pftags_storage[0].ti_Data = vHidd_ColorModel_TrueColor;
+        pftags_storage[1].ti_Tag = aHidd_PixFmt_RedShift;      pftags_storage[1].ti_Data = red_shift;
+        pftags_storage[2].ti_Tag = aHidd_PixFmt_GreenShift;    pftags_storage[2].ti_Data = green_shift;
+        pftags_storage[3].ti_Tag = aHidd_PixFmt_BlueShift;     pftags_storage[3].ti_Data = blue_shift;
+        pftags_storage[4].ti_Tag = aHidd_PixFmt_AlphaShift;    pftags_storage[4].ti_Data = alpha_shift;
+        pftags_storage[5].ti_Tag = aHidd_PixFmt_RedMask;       pftags_storage[5].ti_Data = pixfmt->Rmask;
+        pftags_storage[6].ti_Tag = aHidd_PixFmt_GreenMask;     pftags_storage[6].ti_Data = pixfmt->Gmask;
+        pftags_storage[7].ti_Tag = aHidd_PixFmt_BlueMask;      pftags_storage[7].ti_Data = pixfmt->Bmask;
+        pftags_storage[8].ti_Tag = aHidd_PixFmt_AlphaMask;     pftags_storage[8].ti_Data = pixfmt->Amask;
+        pftags_storage[9].ti_Tag = aHidd_PixFmt_Depth;         pftags_storage[9].ti_Data = pixfmt->BitsPerPixel;
+        pftags_storage[10].ti_Tag = aHidd_PixFmt_BitsPerPixel; pftags_storage[10].ti_Data = pixfmt->BitsPerPixel;
+        pftags_storage[11].ti_Tag = aHidd_PixFmt_BytesPerPixel;pftags_storage[11].ti_Data = pixfmt->BytesPerPixel;
+        pftags_storage[12].ti_Tag = aHidd_PixFmt_StdPixFmt;    pftags_storage[12].ti_Data = stdpixfmt;
+        pftags_storage[13].ti_Tag = aHidd_PixFmt_BitMapType;   pftags_storage[13].ti_Data = vHidd_BitMapType_Chunky;
+        pftags_storage[14].ti_Tag = TAG_DONE;                   pftags_storage[14].ti_Data = 0;
     }
+#endif /* !(__aarch64__ && HOST_OS_darwin) */
 
     modes = SP(SDL_ListModes, NULL, surftype | LIBBASE->use_fullscreen ? SDL_FULLSCREEN : 0);
-    D(bug("[sdl] available modes:"));
+    bug("[sdlgfx] New: SDL_ListModes=%p nmodes=", modes);
     if (modes == NULL) {
         D(bug(" none\n"));
         nmodes = 0;
@@ -285,7 +335,9 @@ OOP_Object *SDLGfx__Root__New(OOP_Class *cl, OOP_Object *o, struct pRoot_New *ms
 
     D(bug("[sdl] hidd tags built, calling supermethod\n"));
 
+    bug("[sdlgfx] New: calling DoSuperMethod with %d modes\n", nmodes);
     o = (OOP_Object *) OOP_DoSuperMethod(cl, o, (OOP_Msg) &supermsg);
+    bug("[sdlgfx] New: DoSuperMethod returned %p\n", o);
 
     DeletePool(tagpool);
 
@@ -328,6 +380,10 @@ VOID SDLGfx__Root__Get(OOP_Class *cl, OOP_Object *o, struct pRoot_Get *msg)
             case aoHidd_Gfx_DriverName:
                 *msg->storage = (IPTR)"SDL";
                 return;
+
+            case aoHidd_Gfx_NoFrameBuffer:
+                *msg->storage = FALSE;
+                return;
         }
     }
     OOP_DoSuperMethod(cl, o, (OOP_Msg)msg);
@@ -360,6 +416,7 @@ VOID SDLGfx__Root__Set(OOP_Class *cl, OOP_Object *obj, struct pRoot_Set *msg)
 OOP_Object *SDLGfx__Hidd_Gfx__CreateObject(OOP_Class *cl, OOP_Object *o, struct pHidd_Gfx_CreateObject *msg) {
     OOP_Object      *object = NULL;
 
+    bug("[sdl] CreateObject: cl=%p basebm=%p\n", msg->cl, LIBBASE->basebm);
     if (msg->cl == LIBBASE->basebm)
     {
         struct TagItem *msgtags;

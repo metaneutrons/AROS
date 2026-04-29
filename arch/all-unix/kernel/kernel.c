@@ -165,6 +165,9 @@ static const char *kernel_functions[] =
     "sigaddset",
     "sigdelset",
 #endif
+#if defined(HOST_OS_darwin) && defined(__aarch64__)
+    "sys_icache_invalidate",
+#endif
     NULL
 };
 

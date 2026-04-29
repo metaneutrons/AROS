@@ -12,7 +12,9 @@
 #include <aros/libcall.h>
 #include <aros/asmcall.h>
 #include <dos/dosextens.h>
+#include <dos/dostags.h>
 #include <dos/cliinit.h>
+#include <intuition/screens.h>
 #include <dos/stdio.h>
 #include <utility/tagitem.h>
 #include <libraries/expansionbase.h>
@@ -69,6 +71,63 @@ extern void BCPL_cliInit(void);
 
 void __dos_Boot(struct DosLibrary *DOSBase, ULONG BootFlags, UBYTE Flags)
 {
+#if defined(HOST_OS_darwin) && defined(__aarch64__)
+    /* Load SDL monitor directly - ExAll/MatchFirst has a double-free bug
+     * that prevents using AROSMonDrvs for directory scanning.
+     * Use CreateNewProcTags to run it asynchronously. */
+    bug("[DOS] darwin-aarch64: loading SDL monitor\n");
+    {
+        BPTR seg = LoadSeg("DEVS:Monitors/SDL");
+        if (seg) {
+            struct Process *proc = CreateNewProcTags(
+                NP_Seglist, (IPTR)seg,
+                NP_FreeSeglist, TRUE,
+                NP_Name, (IPTR)"SDL Monitor",
+                NP_Priority, 0,
+                TAG_DONE);
+            bug("[DOS] SDL monitor process=%p\n", proc);
+            /* Give it time to initialize */
+            Delay(50);
+            bug("[DOS] Opening screen...\n");
+            {
+                struct Library *IntuitionBase = OpenLibrary("intuition.library", 0);
+                if (IntuitionBase) {
+                    struct Screen *scr;
+                    struct TagItem scrTags[] = {
+                        { SA_Width, 640 },
+                        { SA_Height, 480 },
+                        { SA_Depth, 24 },
+                        { SA_Title, (IPTR)"AROS on macOS" },
+                        { SA_ShowTitle, TRUE },
+                        { TAG_DONE, 0 }
+                    };
+                    scr = (struct Screen *)AROS_LC2(struct Screen *, OpenScreenTagList,
+                        AROS_LCA(struct NewScreen *, NULL, A0),
+                        AROS_LCA(struct TagItem *, scrTags, A1),
+                        struct Library *, IntuitionBase, 102, Intuition);
+                    bug("[DOS] OpenScreenTagList=%p\n", scr);
+                    /* Don't close - keep screen open */
+                    CloseLibrary(IntuitionBase);
+                }
+            }
+        } else {
+            bug("[DOS] SDL monitor not found\n");
+        }
+    }
+    bug("[DOS] Executing S:Startup-Sequence\n");
+    {
+        BPTR fh = Open("S:Startup-Sequence", MODE_OLDFILE);
+        if (fh) {
+            Execute("", fh, BNULL);
+            Close(fh);
+        } else {
+            bug("[DOS] No S:Startup-Sequence\n");
+        }
+    }
+    bug("[DOS] Boot complete\n");
+    Wait(0);
+    return;
+#endif
     BPTR cis = BNULL;
 
     /*  We have been created as a process by DOS, we should now

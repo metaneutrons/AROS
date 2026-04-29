@@ -10,6 +10,16 @@
 
 #include "bootstrap.h"
 
+/*
+ * MAP_32BIT is an x86_64 concept for allocating in the low 4GB.
+ * On AArch64 it is meaningless and on macOS arm64 the low address
+ * space is too small for AROS RAM allocations.
+ */
+#if defined(__aarch64__) || defined(__arm64__)
+#undef MAP_32BIT
+#define MAP_32BIT 0
+#endif
+
 #ifndef MAP_32BIT
 #define MAP_32BIT 0
 #endif
@@ -20,18 +30,14 @@
 
 /*
  * macOS on Apple Silicon (arm64) enforces W^X: pages cannot be both
- * writable and executable simultaneously. MAP_JIT allows the OS to
- * manage per-thread write/execute permissions via
- * pthread_jit_write_protect_np(). We use MAP_JIT for all RAM
- * allocations that may contain executable code (FullJumpVec stubs
- * written by the ELF loader and shell command init).
+ * writable and executable simultaneously.
+ *
+ * We allocate RAM as plain RW (no MAP_JIT) and use mprotect() to toggle
+ * individual pages to RX when they contain executable code. This avoids
+ * the MAP_JIT per-thread global toggle which is incompatible with AROS's
+ * unified memory model.
  */
-#if defined(HOST_OS_darwin) && defined(__aarch64__)
-#include <pthread.h>
-#define AROS_HOST_MAP_JIT MAP_JIT
-#else
 #define AROS_HOST_MAP_JIT 0
-#endif
 
 static void *data = NULL;
 static void *code = NULL;
@@ -104,16 +110,32 @@ void *AllocateRW(size_t len)
  * need to have full permissions.
  * Yes, iOS will silently mask out PROT_EXEC here. This is bad.
  * Well, iOS will be a little bit special story in InternalLoadSeg()...
+ *
+ * On darwin-aarch64, MAP_JIT requires MAP_PRIVATE (MAP_SHARED is
+ * incompatible with MAP_JIT). The W^X toggle is done per-thread via
+ * pthread_jit_write_protect_np().
  */
+#define AROS_HOST_MAP_RAMFLAGS MAP_SHARED
+
+/*
+ * On darwin-aarch64, we can't have RWX pages without MAP_JIT.
+ * Allocate as RW and use mprotect to toggle pages to RX when needed.
+ */
+#if defined(__APPLE__) && defined(__aarch64__)
+#define AROS_HOST_RAM_PROT (PROT_READ|PROT_WRITE)
+#else
+#define AROS_HOST_RAM_PROT (PROT_READ|PROT_WRITE|PROT_EXEC)
+#endif
+
 void *AllocateRAM32(size_t len)
 {
-    return doMMap(&RAM32, &RAM32_len, len, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED|MAP_32BIT|AROS_HOST_MAP_JIT);
+    return doMMap(&RAM32, &RAM32_len, len, AROS_HOST_RAM_PROT, MAP_ANON|AROS_HOST_MAP_RAMFLAGS|MAP_32BIT|AROS_HOST_MAP_JIT);
 }
 
 #if (__WORDSIZE == 64)
 void *AllocateRAM(size_t len)
 {
-    return doMMap(&RAM, &RAM_len, len, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED|AROS_HOST_MAP_JIT);
+    return doMMap(&RAM, &RAM_len, len, AROS_HOST_RAM_PROT, MAP_ANON|AROS_HOST_MAP_RAMFLAGS|AROS_HOST_MAP_JIT);
 }
 #endif
 

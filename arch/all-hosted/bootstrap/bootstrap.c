@@ -339,9 +339,24 @@ int bootstrap(int argc, char ** argv)
     if (!GetKernelSize(FirstELF, &ro_size, &rw_size, &bss_size))
         return -1;
 
-    ro_addr = AllocateRO(ro_size);
-    D(fprintf(stderr, "[Bootstrap] Kickstart ROM area: %p\n", ro_addr));
+#ifdef __aarch64__
+    /* Reserve space for the GOT at the end of the RO region.
+     * The GOT must be in the same mmap region as the code so that
+     * PC-relative adrp instructions can reach it. */
+    {
+        extern void elfloader_SetGOT(void *got_base);
+        unsigned long got_size = 256 * sizeof(void *);
+        ro_size = (ro_size + 4095) & ~4095UL; /* align to 4K */
+        ro_addr = AllocateRO(ro_size + got_size);
+        if (ro_addr)
+            elfloader_SetGOT((char *)ro_addr + ro_size);
+        ro_size += got_size;
+    }
     if (!ro_addr)
+#else
+    ro_addr = AllocateRO(ro_size);
+    if (!ro_addr)
+#endif
     {
         DisplayError("Failed to allocate %u bytes for the kickstart!", ro_size);
         return -1;
@@ -372,11 +387,16 @@ int bootstrap(int argc, char ** argv)
     FreeKernelList();
 
     D(fprintf(stderr, "[Bootstrap] Sealing kernel code memory\n"));
+    fprintf(stderr, "[Bootstrap] SetRO(%p, %u)...\n", ro_addr, (unsigned)ro_size);
+    fprintf(stderr, "[Bootstrap] RO: %p - %p (%u bytes)\n", ro_addr, ro_addr + ro_size, (unsigned)ro_size);
+    fprintf(stderr, "[Bootstrap] RW: %p (%u bytes)\n", rw_addr, (unsigned)rw_size);
+    fprintf(stderr, "[Bootstrap] BSS track: %p (%u bytes)\n", __bss_track, (unsigned)bss_size);
     if (SetRO(ro_addr, ro_size))
     {
-        DisplayError("Failed to set kernel memory permissions");
+        DisplayError("Failed to set kernel memory permissions: %s", strerror(errno));
         return -1;
     }
+    fprintf(stderr, "[Bootstrap] Kernel code sealed OK\n");
 
 
     km[0].ti_Data = (IPTR)ro_addr;
@@ -394,6 +414,13 @@ int bootstrap(int argc, char ** argv)
 
     /* Flush instruction cache */
     __clear_cache((char *)ro_addr, (char *)ro_addr + ro_size);
+
+    fprintf(stderr, "[Bootstrap] Entry point: %p, first words: %08x %08x %08x %08x\n",
+            kernel_entry,
+            ((unsigned int *)(void *)kernel_entry)[0],
+            ((unsigned int *)(void *)kernel_entry)[1],
+            ((unsigned int *)(void *)kernel_entry)[2],
+            ((unsigned int *)(void *)kernel_entry)[3]);
     
 #ifdef DEBUG_CODE
     /* This is a quickly hacked up sanity test which was used during iOS port development */

@@ -460,6 +460,9 @@ void internal_ChildFree(APTR tid, struct DosLibrary * DOSBase);
         process->pr_Flags |= PRF_FREESEGLIST;
     } else if (entry == NULL) {
         entry = BADDR(segList) + sizeof(BPTR);
+#ifdef __AROS_SEG_ENTRY
+        entry = __AROS_SEG_ENTRY(segList);
+#endif
     }
 
     segArray = AllocVec(sizeof(BPTR) * (SEGARRAY_LENGTH+1), MEMF_ANY | MEMF_CLEAR);
@@ -743,6 +746,10 @@ static void DosEntry(void)
     segArray = BADDR(me->pr_SegList);
     if (initialPC == NULL)
         initialPC = BADDR(segArray[3]) + sizeof(BPTR);
+#ifdef __AROS_SEG_ENTRY
+        initialPC = __AROS_SEG_ENTRY(segArray[3]);
+        bug("[CNP] initialPC=%p (from SEG_ENTRY)\n", initialPC);
+#endif
 
     D(bug("[DosEntry %p] entry=%p, CIS=%p, COS=%p, argsize=%d, arguments=\"%s\"\n", me, initialPC, BADDR(me->pr_CIS), BADDR(me->pr_COS), argSize, me->pr_Arguments));
 

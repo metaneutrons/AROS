@@ -159,7 +159,7 @@ OOP_Object *GFXHIDD__Root__New(OOP_Class *cl, OOP_Object *o, struct pRoot_New *m
 
     o = (OOP_Object *)OOP_DoSuperMethod(cl, o, (OOP_Msg)&new_msg);
 
-    D(bug("Got object o=%x\n", o));
+    bug("[GFX::New] Root::New returned o=%p\n", o);
 
     if (o)
     {
@@ -193,6 +193,7 @@ OOP_Object *GFXHIDD__Root__New(OOP_Class *cl, OOP_Object *o, struct pRoot_New *m
 
         /* Register modes only after other attributes are initialized */
         ok = modetags ? register_modes(cl, o, modetags) : TRUE;
+        bug("[GFX::New] register_modes=%d modetags=%p\n", ok, modetags);
 
         /* Create a gc that we can use for some rendering */
         if (ok)
@@ -200,7 +201,7 @@ OOP_Object *GFXHIDD__Root__New(OOP_Class *cl, OOP_Object *o, struct pRoot_New *m
             data->gc = OOP_NewObject(CSD(cl)->gcclass, NULL, gctags);
             if (NULL == data->gc)
             {
-                D(bug("Could not get gc\n"));
+                bug("[GFX::New] Could not create gc\n");
                 ok = FALSE;
             }
         }
@@ -1779,9 +1780,14 @@ static BOOL register_modes(OOP_Class *cl, OOP_Object *o, struct TagItem *modetag
 
     ObtainSemaphore(&mdb->sema);
     
+    bug("[GFX] register_modes: numpfs=%d numsyncs=%d\n", numpfs, numsyncs);
+
     /* Allocate memory for mode db */
     if (!alloc_mode_db(&data->mdb, numsyncs, numpfs, cl))
+    {
+        bug("[GFX] register_modes: alloc_mode_db FAILED\n");
         goto failure;
+    }
     
     
     for (tstate = modetags; (tag = NextTagItem(&tstate));)
@@ -1799,7 +1805,7 @@ static BOOL register_modes(OOP_Class *cl, OOP_Object *o, struct TagItem *modetag
                     
                     if (NULL == mdb->pixfmts[pfidx])
                     {
-                        D(bug("!!! UNABLE TO CREATE PIXFMT OBJECT IN Gfx::RegisterModes() !!!\n"));
+                        bug("[GFX] register_modes: RegisterPixFmt FAILED for pfidx=%d\n", pfidx);
                         goto failure;
                     }
                     
@@ -1811,7 +1817,7 @@ static BOOL register_modes(OOP_Class *cl, OOP_Object *o, struct TagItem *modetag
 
                     mdb->syncs[syncidx] = OOP_NewObject(CSD(cl)->syncclass, NULL, def_sync_tags);
                     if (!mdb->syncs[syncidx]) {
-                        D(bug("!!! UNABLE TO CREATE SYNC OBJECT IN Gfx::RegisterModes() !!!\n"));
+                        bug("[GFX] register_modes: Sync creation FAILED for syncidx=%d\n", syncidx);
                         goto failure;
                     }
 

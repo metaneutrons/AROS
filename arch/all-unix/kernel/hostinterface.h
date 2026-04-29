@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define HOSTINTERFACE_VERSION 4
+#define HOSTINTERFACE_VERSION 6
 
 struct HostInterface
 {
@@ -16,6 +16,13 @@ struct HostInterface
     int   (*KPutC)(int chr);
     int   (*host_GetTime)(int, uint64_t *, uint64_t *);
     struct MinList **ModListPtr;
+    void  (*jit_write_protect)(int enabled);  /* W^X toggle for MAP_JIT (NULL if not needed) */
+
+    /* Cocoa display (darwin-aarch64 only, NULL otherwise) */
+    void *(*cocoa_display_init)(int w, int h);
+    int   (*cocoa_display_get_pitch)(void);
+    void  (*cocoa_display_refresh)(void);
+    void  (*cocoa_runloop_step)(void);
 };
 
 #endif /* !_HOSTINTERFACE_H */

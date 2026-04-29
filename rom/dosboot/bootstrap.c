@@ -293,6 +293,7 @@ LONG dosboot_BootStrap(LIBBASETYPEPTR LIBBASE)
      * highest priority first.
      */
     ListLength(&ExpansionBase->MountList, nodes);
+    bug("[DOSBoot] BootStrap: %d boot nodes\n", nodes);
     for (i = 0; i < nodes; i++)
     {
         struct MsgPort *msgport;
@@ -300,6 +301,7 @@ LONG dosboot_BootStrap(LIBBASETYPEPTR LIBBASE)
 
         bn = (struct BootNode *)GetHead(&ExpansionBase->MountList);
 
+        bug("[DOSBoot] Trying boot node: %s (type=%d pri=%d dn=%p)\n", bn->bn_Node.ln_Name ? bn->bn_Node.ln_Name : "(null)", bn->bn_Node.ln_Type, bn->bn_Node.ln_Pri, bn->bn_DeviceNode);
         if (bn->bn_Node.ln_Type != NT_BOOTNODE ||
             bn->bn_Node.ln_Pri <= -128 ||
             bn->bn_DeviceNode == NULL)

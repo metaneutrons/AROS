@@ -18,6 +18,10 @@
 
 #include "sdl_intern.h"
 
+/* Forward declarations for string functions */
+int strcmp(const char *, const char *);
+int strncmp(const char *, const char *, __SIZE_TYPE__);
+
 #define DEBUG 0
 #include <aros/debug.h>
 
@@ -104,7 +108,11 @@ int sdl_hostlib_init(LIBBASETYPEPTR LIBBASE)
     else if (!strncmp(arch, "darwin", 6))
         LibraryFile = SDL_DYLIBFILE;
 
-    if ((LIBBASE->sdl_handle = sdl_hostlib_load_so(LibraryFile, sdl_func_names, (void **) &sdl_funcs)) == NULL)
+    LIBBASE->sdl_handle = sdl_hostlib_load_so(LibraryFile, sdl_func_names, (void **) &sdl_funcs);
+    /* If .so failed, try .dylib (darwin-hosted with non-darwin arch string) */
+    if (!LIBBASE->sdl_handle && strcmp(LibraryFile, SDL_DYLIBFILE))
+        LIBBASE->sdl_handle = sdl_hostlib_load_so(SDL_DYLIBFILE, sdl_func_names, (void **) &sdl_funcs);
+    if (!LIBBASE->sdl_handle)
         return FALSE;
 
     return TRUE;

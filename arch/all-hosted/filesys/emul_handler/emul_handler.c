@@ -684,7 +684,13 @@ static struct filehandle *new_volume(struct emulbase *emulbase, const char *path
            if (_x == BNULL) { \
              _fh = fhv; \
            } else { \
-             _fh = (APTR)(((struct FileLock *)BADDR(_x))->fl_Key); \
+             struct FileLock *_fl = (struct FileLock *)BADDR(_x); \
+             IPTR _key = _fl->fl_Key; \
+             /* Validate: fl_Key must be a reasonable pointer, not a small int */ \
+             if (_key > 0x10000) \
+               _fh = (APTR)_key; \
+             else \
+               _fh = fhv; \
            } \
            (struct filehandle *)_fh;\
          })
@@ -957,15 +963,19 @@ static void handlePacket(struct emulbase *emulbase, struct filehandle *fhv, stru
         break;
 
     case ACTION_FREE_LOCK:
-        fh = FH_FROM_LOCK(dp->dp_Arg1);
         fl = BADDR(dp->dp_Arg1);
-        DCMD(bug("[emul] %p ACTION_FREE_LOCK: %p\n", fhv, fh));
-
-        FreeMem(fl, sizeof(*fl));
-        if (fh != fhv) {
-            fh->locks--;
-            if (!fh->locks)
-                free_lock(emulbase, fh);
+        if (fl) {
+            fh = (struct filehandle *)fl->fl_Key;
+            DCMD(bug("[emul] %p ACTION_FREE_LOCK: %p\n", fhv, fh));
+            /* Clear fl_Key so stale references via FH_FROM_LOCK return fhv (root) */
+            fl->fl_Key = 0;
+            fl->fl_Task = NULL;
+            FreeMem(fl, sizeof(*fl));
+            if (fh && fh != fhv) {
+                fh->locks--;
+                if (!fh->locks)
+                    free_lock(emulbase, fh);
+            }
         }
 
         Res2 = 0;
@@ -1134,6 +1144,12 @@ static void handlePacket(struct emulbase *emulbase, struct filehandle *fhv, stru
     case ACTION_MORE_CACHE:
     case ACTION_WAIT_CHAR:
   */
+    case ACTION_DIE:
+        /* Cannot die - we're the boot filesystem */
+        Res2 = ERROR_ACTION_NOT_KNOWN;
+        Res1 = DOSFALSE;
+        break;
+
     default:
         DCMD(bug("[emul] Unknown action %lu\n", dp->dp_Type));
         Res2 = ERROR_ACTION_NOT_KNOWN;

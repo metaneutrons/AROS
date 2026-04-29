@@ -28,6 +28,8 @@ static LONG startup(struct emulbase *emulbase)
 {
     APTR ExpansionBase;
 
+    bug("[EmulHandler] &SysBase=%p SysBase=%p\n", &SysBase, (void *)SysBase);
+
     D(bug("[Emulhandler] startup\n"));
 
     HostLibBase = OpenResource("hostlib.resource");

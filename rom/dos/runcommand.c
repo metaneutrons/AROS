@@ -142,6 +142,9 @@
     args.Args[0] = (IPTR)argptr;
     args.Args[1] = argsize;
     args.Args[2] = (IPTR)BADDR(segList) + sizeof(BPTR);
+#ifdef __AROS_SEG_ENTRY
+    args.Args[2] = (IPTR)__AROS_SEG_ENTRY(segList);
+#endif
     args.Args[3] = (IPTR)me;
 
     ret = NewStackSwap(&sss, CallEntry, &args);

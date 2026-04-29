@@ -9,6 +9,7 @@
 #include <exec/libraries.h>
 #include <proto/debug.h>
 #include <proto/exec.h>
+#include <proto/kernel.h>
 
 #include "dos_intern.h"
 #include "internalloadseg.h"
@@ -74,6 +75,25 @@
         while (seglist)
         {
             next = *(BPTR *)BADDR(seglist);
+#if defined(__aarch64__)
+            /* Check if this is an mmap'd hunk (from KrnAllocPages) */
+            {
+                ULONG *sizeptr = (ULONG *)BADDR(seglist) - 1;
+                if ((*sizeptr >> 30) & 2) /* HUNKF_MMAP flag in high bits */
+                {
+                    APTR KernelBase = OpenResource("kernel.resource");
+                    if (KernelBase)
+                    {
+                        /* The hunk starts before the BPTR field */
+                        void *hunk_base = (char *)BADDR(seglist) - 4; /* sizeof(ULONG) for size field */
+                        ULONG hunk_size = *sizeptr & 0x3FFFFFFFUL;
+                        KrnFreePages(hunk_base, hunk_size);
+                        seglist = next;
+                        continue;
+                    }
+                }
+            }
+#endif
             ilsFreeVec(BADDR(seglist));
             seglist = next;
         }

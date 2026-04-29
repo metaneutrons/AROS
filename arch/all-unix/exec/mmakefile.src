@@ -17,7 +17,7 @@ PRIV_EXEC_INCLUDES = \
     $(TARGET_KERNEL_INCLUDES) \
     -I$(SRCDIR)/rom/kernel
 
-FILES := platform_init coldreboot shutdowna
+FILES := platform_init coldreboot shutdowna cachecleare
 
 USER_INCLUDES := $(PRIV_EXEC_INCLUDES) \
 		 -isystem $(GENINCDIR) $(KERNEL_INCLUDES)

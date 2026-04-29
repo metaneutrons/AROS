@@ -1118,26 +1118,36 @@ static int UXIO_Init(LIBBASETYPEPTR LIBBASE)
 {
     ULONG i;
 
-    D(bug("[UnixIO] Init\n"));
+    bug("[UnixIO] Init start\n");
 
     KernelBase = OpenResource("kernel.resource");
     if (!KernelBase)
         return FALSE;
 
+    bug("[UnixIO] KernelBase=%p\n", KernelBase);
+
     HostLibBase = OpenResource("hostlib.resource");
     if (!HostLibBase)
         return FALSE;
+
+    bug("[UnixIO] HostLibBase=%p\n", HostLibBase);
 
     LIBBASE->SystemArch = (STRPTR)KrnGetSystemAttr(KATTR_Architecture);
     if (!LIBBASE->SystemArch)
         return FALSE;
 
+    bug("[UnixIO] SystemArch=%s\n", LIBBASE->SystemArch);
+
     if (!CheckArch(LIBBASE, "unixio.hidd", AROS_ARCHITECTURE))
         return FALSE;
+
+    bug("[UnixIO] Arch check passed\n");
 
     LIBBASE->UnixIOAB = OOP_ObtainAttrBase(IID_Hidd_UnixIO);
     if (!LIBBASE->UnixIOAB)
         return FALSE;
+
+    bug("[UnixIO] AttrBase=%lx\n", (unsigned long)LIBBASE->UnixIOAB);
 
     LIBBASE->uio_Public.uio_LibcHandle = HostLib_Open(LIBC_NAME, NULL);
     if (!LIBBASE->uio_Public.uio_LibcHandle)

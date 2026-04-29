@@ -187,8 +187,11 @@ OOP_Object *HW__HW__AddDriver(OOP_Class *cl, OOP_Object *o,
         if (dn)
         {
             dn->driverObject = OOP_NewObject(msg->driverClass, NULL, msg->tags);
+            bug("[HW] %s: OOP_NewObject(class=%p, tags=%p) = %p\n", __func__,
+                msg->driverClass, msg->tags, dn->driverObject);
             if (dn->driverObject)
             {
+                bug("[HW] %s: Calling SetUpDriver...\n", __func__);
                 if (HW_SetUpDriver(o, dn->driverObject))
                 {
                     /* Attach the driver instance to the tail of the driver objects list */
