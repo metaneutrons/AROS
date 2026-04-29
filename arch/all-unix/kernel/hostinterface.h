@@ -23,6 +23,10 @@ struct HostInterface
     int   (*cocoa_display_get_pitch)(void);
     void  (*cocoa_display_refresh)(void);
     void  (*cocoa_runloop_step)(void);
+    void  *cocoa_fb_base;   /* Framebuffer pixel base address */
+    int    cocoa_fb_width;
+    int    cocoa_fb_height;
+    int    cocoa_fb_pitch;
 };
 
 #endif /* !_HOSTINTERFACE_H */

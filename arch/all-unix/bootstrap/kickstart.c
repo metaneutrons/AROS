@@ -27,10 +27,12 @@ int pthread_detach(pthread_t_host);
 
 #include "kickstart.h"
 #include "platform.h"
+#include "hostinterface.h"
 
 #if defined(__APPLE__) && defined(__aarch64__)
 
 extern void *cocoa_display_init(int width, int height);
+extern int   cocoa_display_get_pitch(void);
 extern void  cocoa_runloop_step(void);
 
 struct kick_args {
@@ -55,12 +57,25 @@ int kick(kernel_entry_fun_t addr, struct TagItem *msg)
     struct kick_args ka = { addr, msg, 0 };
     pthread_t_host tid;
 
+    /* Init Cocoa display FIRST (must happen on main thread) */
+    {
+        extern void *HostIFace;
+        struct HostInterface *hi = (struct HostInterface *)HostIFace;
+        void *fb = cocoa_display_init(640, 480);
+        hi->cocoa_fb_base = fb;
+        hi->cocoa_fb_width = 640;
+        hi->cocoa_fb_height = 480;
+        hi->cocoa_fb_pitch = cocoa_display_get_pitch();
+        fprintf(stderr, "[Bootstrap] Framebuffer at %p, %dx%d pitch=%d\n",
+                fb, 640, 480, hi->cocoa_fb_pitch);
+    }
+
+    /* NOW start the kernel on a background thread */
     fprintf(stderr, "[Bootstrap] Starting kernel on background thread...\n");
     pthread_create(&tid, NULL, kernel_thread, &ka);
     pthread_detach(tid);
 
-    /* Main thread: init Cocoa display and pump the run loop */
-    cocoa_display_init(640, 480);
+    /* Main thread: pump the Cocoa run loop forever */
     for (;;)
         cocoa_runloop_step();
 

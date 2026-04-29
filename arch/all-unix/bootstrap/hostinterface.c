@@ -73,6 +73,10 @@ static struct HostInterface _HostIFace =
     cocoa_display_get_pitch,
     cocoa_display_refresh,
     cocoa_runloop_step,
+    NULL,  /* cocoa_fb_base - set at runtime */
+    0,     /* cocoa_fb_width */
+    0,     /* cocoa_fb_height */
+    0,     /* cocoa_fb_pitch */
 #else
     NULL,
     NULL,
