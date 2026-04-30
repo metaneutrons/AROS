@@ -72,20 +72,20 @@ extern void BCPL_cliInit(void);
 void __dos_Boot(struct DosLibrary *DOSBase, ULONG BootFlags, UBYTE Flags)
 {
 #if defined(HOST_OS_darwin) && defined(__aarch64__)
-    /* Load SDL monitor directly - ExAll/MatchFirst has a double-free bug
+    /* Load Cocoa display driver directly - ExAll/MatchFirst has a double-free bug
      * that prevents using AROSMonDrvs for directory scanning.
      * Use CreateNewProcTags to run it asynchronously. */
-    bug("[DOS] darwin-aarch64: loading SDL monitor\n");
+    bug("[DOS] darwin-aarch64: loading Cocoa display driver\n");
     {
-        BPTR seg = LoadSeg("DEVS:Monitors/SDL");
+        BPTR seg = LoadSeg("DEVS:Monitors/CocoaGfx");
         if (seg) {
             struct Process *proc = CreateNewProcTags(
                 NP_Seglist, (IPTR)seg,
                 NP_FreeSeglist, TRUE,
-                NP_Name, (IPTR)"SDL Monitor",
+                NP_Name, (IPTR)"Cocoa Display",
                 NP_Priority, 0,
                 TAG_DONE);
-            bug("[DOS] SDL monitor process=%p\n", proc);
+            bug("[DOS] Cocoa display process=%p\n", proc);
             /* Give it time to initialize */
             Delay(50);
             bug("[DOS] Opening screen...\n");
@@ -111,7 +111,7 @@ void __dos_Boot(struct DosLibrary *DOSBase, ULONG BootFlags, UBYTE Flags)
                 }
             }
         } else {
-            bug("[DOS] SDL monitor not found\n");
+            bug("[DOS] Cocoa display driver not found\n");
         }
     }
     bug("[DOS] Executing S:Startup-Sequence\n");
