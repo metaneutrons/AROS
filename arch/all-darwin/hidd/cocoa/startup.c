@@ -87,15 +87,13 @@ __startup AROS_PROCH(__startup_entry, argstr, argsize, sysBase)
 int __startup_error_storage;
 int *__startup_error_ptr = &__startup_error_storage;
 
+APTR KernelBase;
+
 int main(void)
 {
-    APTR KernelBase;
-    struct Library *OOPBase;
-    struct Library *UtilityBase;
-
-    /* Open libraries first - FindTagItem needs UtilityBase */
+    /* Open libraries - these set the global variables used by OOP macros */
     OOPBase = OpenLibrary("oop.library", 0);
-    UtilityBase = OpenLibrary("utility.library", 0);
+    UtilityBase = (APTR)OpenLibrary("utility.library", 0);
     KernelBase = OpenResource("kernel.resource");
 
     if (KernelBase && OOPBase && UtilityBase) {
