@@ -10,7 +10,7 @@
 #include <proto/exec.h>
 #include <proto/oop.h>
 #include <proto/utility.h>
-#include <string.h>
+
 
 #include "cocoa_intern.h"
 #include "hostinterface.h"
@@ -117,7 +117,7 @@ VOID CocoaBM__Hidd_BitMap__PutImage(OOP_Class *cl, OOP_Object *o,
         int i;
 
         for (i = 0; i < msg->height; i++) {
-            memcpy(dst, src, copy_width);
+            CopyMem(src, dst, copy_width);
             src += msg->modulo;
             dst += data->pitch;
         }
@@ -141,7 +141,7 @@ VOID CocoaBM__Hidd_BitMap__GetImage(OOP_Class *cl, OOP_Object *o,
         int i;
 
         for (i = 0; i < msg->height; i++) {
-            memcpy(dst, src, copy_width);
+            CopyMem(src, dst, copy_width);
             src += data->pitch;
             dst += msg->modulo;
         }

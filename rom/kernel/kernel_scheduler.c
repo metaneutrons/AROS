@@ -73,7 +73,7 @@ void core_Switch(void)
     if ((task->tc_State != TS_WAIT) && (task->tc_State != TS_REMOVED))
         task->tc_State = TS_READY;
 
-#ifndef __mc68000
+#if !defined(__mc68000) && !defined(HOST_OS_darwin)
     if (task->tc_SPReg <= task->tc_SPLower || task->tc_SPReg > task->tc_SPUpper)
     {
         bug("[KRN] Task %s went out of stack limits\n", task->tc_Node.ln_Name);
@@ -145,7 +145,7 @@ struct Task *core_Dispatch(void)
          * For example WB3.1 C:SetPatch adds exec/OpenDevice() patch that swaps stacks manually.
          * Result is that _all_ programs that call OpenDevice() crash if stack is checked.
          */
-#ifndef __mc68000
+#if !defined(__mc68000) && !defined(HOST_OS_darwin)
         if (task->tc_SPReg <= task->tc_SPLower || task->tc_SPReg > task->tc_SPUpper)
             task->tc_State     = TS_WAIT;
         else

@@ -70,7 +70,7 @@ int kick(kernel_entry_fun_t addr, struct TagItem *msg)
                 fb, 640, 480, hi->cocoa_fb_pitch);
     }
 
-    /* NOW start the kernel on a background thread */
+    /* Start kernel on background thread */
     fprintf(stderr, "[Bootstrap] Starting kernel on background thread...\n");
     pthread_create(&tid, NULL, kernel_thread, &ka);
     pthread_detach(tid);

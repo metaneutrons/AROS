@@ -5,8 +5,14 @@
  * Loaded via LoadSeg + CreateNewProcTags from boot.c.
  */
 
+#define DEBUG 0
 #include <aros/debug.h>
+
+
 #include <aros/kernel.h>
+#include <aros/symbolsets.h>
+#include <aros/asmcall.h>
+#include <aros/startup.h>
 #include <dos/dosextens.h>
 #include <dos/dos.h>
 #include <hidd/gfx.h>
@@ -41,135 +47,124 @@ OOP_AttrBase __IHidd_Sync;
 OOP_AttrBase __IHidd_PixFmt;
 
 int __nocommandline = 1;
+int __noinitexitsets = 1;
+
+/* These are normally provided by initexitsets.o which we exclude via __noinitexitsets. */
+THIS_PROGRAM_HANDLES_SYMBOLSET(LIBS)
+THIS_PROGRAM_HANDLES_SYMBOLSET(INIT)
+THIS_PROGRAM_HANDLES_SYMBOLSET(EXIT)
+THIS_PROGRAM_HANDLES_SYMBOLSET(CTORS)
+THIS_PROGRAM_HANDLES_SYMBOLSET(DTORS)
+THIS_PROGRAM_HANDLES_SYMBOLSET(INIT_ARRAY)
+THIS_PROGRAM_HANDLES_SYMBOLSET(FINI_ARRAY)
+DEFINESET(LIBS);
+DEFINESET(INIT);
+DEFINESET(EXIT);
+DEFINESET(CTORS);
+DEFINESET(DTORS);
+DEFINESET(INIT_ARRAY);
+DEFINESET(FINI_ARRAY);
+void __attribute__((weak)) __register_frame(void *begin) {}
+void __attribute__((weak)) __deregister_frame(void *begin) {}
+
+/* Provide our own minimal startup entry that bypasses PROGRAM_ENTRIES.
+ * The standard startup hangs because task hooks or other init code blocks. */
+LONG __startup_error;
+
+__startup AROS_PROCH(__startup_entry, argstr, argsize, sysBase)
+{
+    AROS_PROCFUNC_INIT
+
+    /* Set the global SysBase from the parameter passed by CreateNewProc */
+    SysBase = sysBase;
+
+    extern int main(void);
+    return main();
+
+    AROS_PROCFUNC_EXIT
+}
+
+int __startup_error_storage;
+int *__startup_error_ptr = &__startup_error_storage;
 
 int main(void)
 {
-    struct GfxBase *GfxBase;
+    APTR KernelBase;
     struct Library *OOPBase;
     struct Library *UtilityBase;
-    LONG err;
 
-    bug("[CocoaGfx] Starting\n");
+    /* Open libraries first - FindTagItem needs UtilityBase */
+    OOPBase = OpenLibrary("oop.library", 0);
+    UtilityBase = OpenLibrary("utility.library", 0);
+    KernelBase = OpenResource("kernel.resource");
 
-    /* Get HostIFace from kernel boot tags */
-    {
-        APTR KernelBase = OpenResource("kernel.resource");
-        if (KernelBase) {
-            struct TagItem *tags = KrnGetBootInfo();
-            if (tags) {
-                struct TagItem *tag = FindTagItem(KRN_HostInterface, tags);
-                if (tag)
-                    HostIFace = (struct HostInterface *)tag->ti_Data;
+    if (KernelBase && OOPBase && UtilityBase) {
+        struct TagItem *tags = KrnGetBootInfo();
+        if (tags) {
+            struct TagItem *tag = FindTagItem(KRN_HostInterface, tags);
+            if (tag) {
+                struct HostInterface *hif = (struct HostInterface *)tag->ti_Data;
+
+                if (hif && hif->cocoa_fb_base) {
+                        struct GfxBase *GfxBase;
+                        LONG err;
+
+                        HostIFace = hif;
+                        xsd.fb_base   = hif->cocoa_fb_base;
+                        xsd.fb_width  = hif->cocoa_fb_width;
+                        xsd.fb_height = hif->cocoa_fb_height;
+                        xsd.fb_pitch  = hif->cocoa_fb_pitch;
+                        xsd.iface     = hif;
+
+                        __IMeta        = OOP_ObtainAttrBase(IID_Meta);
+                        __IHidd        = OOP_ObtainAttrBase(IID_Hidd);
+                        __IHidd_BitMap = OOP_ObtainAttrBase(IID_Hidd_BitMap);
+                        __IHidd_Gfx   = OOP_ObtainAttrBase(IID_Hidd_Gfx);
+                        __IHidd_Sync  = OOP_ObtainAttrBase(IID_Hidd_Sync);
+                        __IHidd_PixFmt= OOP_ObtainAttrBase(IID_Hidd_PixFmt);
+
+                        xsd.hiddBitMapAttrBase = __IHidd_BitMap;
+                        xsd.hiddGfxAttrBase    = __IHidd_Gfx;
+                        xsd.hiddSyncAttrBase   = __IHidd_Sync;
+                        xsd.hiddPixFmtAttrBase = __IHidd_PixFmt;
+
+                        if (__IHidd_BitMap && __IHidd_Gfx) {
+                            struct TagItem gtags[] = {
+                                { aMeta_SuperID,        (IPTR)CLID_Hidd_Gfx },
+                                { aMeta_InterfaceDescr, (IPTR)CocoaGfx_ifdescr },
+                                { aMeta_ID,             (IPTR)"hidd.gfx.cocoa" },
+                                { aMeta_InstSize,       0 },
+                                { TAG_DONE, 0 }
+                            };
+                            struct TagItem btags[] = {
+                                { aMeta_SuperID,        (IPTR)CLID_Hidd_BitMap },
+                                { aMeta_InterfaceDescr, (IPTR)CocoaBM_ifdescr },
+                                { aMeta_InstSize,       sizeof(struct CocoaBMData) },
+                                { TAG_DONE, 0 }
+                            };
+
+                            xsd.gfxclass = OOP_NewObject(NULL, CLID_HiddMeta, gtags);
+                            if (xsd.gfxclass) {
+                                xsd.gfxclass->UserData = &xsd;
+                                xsd.bmclass = OOP_NewObject(NULL, CLID_HiddMeta, btags);
+                                if (xsd.bmclass) {
+                                    xsd.bmclass->UserData = &xsd;
+                                    OOP_AddClass(xsd.gfxclass);
+
+                                    GfxBase = (struct GfxBase *)OpenLibrary("graphics.library", 41);
+                                    if (GfxBase) {
+                                        err = AddDisplayDriverA(xsd.gfxclass, NULL, NULL);
+                                        CloseLibrary((struct Library *)GfxBase);
+                                    }
+                                }
+                            }
+                        }
+                }
             }
         }
     }
 
-    bug("[CocoaGfx] HostIFace=%p\n", HostIFace);
-    if (!HostIFace || !HostIFace->cocoa_fb_base) {
-        bug("[CocoaGfx] No Cocoa framebuffer!\n");
-        bug("[CocoaGfx] No Cocoa framebuffer!\n");
-        return 20;
-    }
-
-    xsd.fb_base   = HostIFace->cocoa_fb_base;
-    xsd.fb_width  = HostIFace->cocoa_fb_width;
-    xsd.fb_height = HostIFace->cocoa_fb_height;
-    xsd.fb_pitch  = HostIFace->cocoa_fb_pitch;
-    xsd.iface     = HostIFace;
-
-    bug("[CocoaGfx] FB: %dx%d @ %p pitch=%d\n",
-        xsd.fb_width, xsd.fb_height, xsd.fb_base, xsd.fb_pitch);
-
-    OOPBase = OpenLibrary("oop.library", 0);
-    if (!OOPBase) return 20;
-
-    UtilityBase = OpenLibrary("utility.library", 0);
-    if (!UtilityBase) { CloseLibrary(OOPBase); return 20; }
-
-    /* Obtain attribute bases */
-    __IMeta        = OOP_ObtainAttrBase(IID_Meta);
-    __IHidd        = OOP_ObtainAttrBase(IID_Hidd);
-    __IHidd_BitMap = OOP_ObtainAttrBase(IID_Hidd_BitMap);
-    __IHidd_Gfx   = OOP_ObtainAttrBase(IID_Hidd_Gfx);
-    __IHidd_Sync  = OOP_ObtainAttrBase(IID_Hidd_Sync);
-    __IHidd_PixFmt= OOP_ObtainAttrBase(IID_Hidd_PixFmt);
-
-    xsd.hiddBitMapAttrBase = __IHidd_BitMap;
-    xsd.hiddGfxAttrBase    = __IHidd_Gfx;
-    xsd.hiddSyncAttrBase   = __IHidd_Sync;
-    xsd.hiddPixFmtAttrBase = __IHidd_PixFmt;
-
-    if (!xsd.hiddBitMapAttrBase || !xsd.hiddGfxAttrBase) {
-        bug("[CocoaGfx] Failed to obtain attr bases\n");
-        goto fail;
-    }
-
-    /* Create GFX class */
-    {
-        struct TagItem tags[] = {
-            { aMeta_SuperID,        (IPTR)CLID_Hidd_Gfx },
-            { aMeta_InterfaceDescr, (IPTR)CocoaGfx_ifdescr },
-            { aMeta_ID,             (IPTR)"hidd.gfx.cocoa" },
-            { aMeta_InstSize,       0 },
-            { TAG_DONE, 0 }
-        };
-        xsd.gfxclass = OOP_NewObject(NULL, CLID_HiddMeta, tags);
-        if (!xsd.gfxclass) {
-            bug("[CocoaGfx] Failed to create GFX class\n");
-            goto fail;
-        }
-        xsd.gfxclass->UserData = &xsd;
-    }
-
-    /* Create BitMap class */
-    {
-        struct TagItem tags[] = {
-            { aMeta_SuperID,        (IPTR)CLID_Hidd_BitMap },
-            { aMeta_InterfaceDescr, (IPTR)CocoaBM_ifdescr },
-            { aMeta_InstSize,       sizeof(struct CocoaBMData) },
-            { TAG_DONE, 0 }
-        };
-        xsd.bmclass = OOP_NewObject(NULL, CLID_HiddMeta, tags);
-        if (!xsd.bmclass) {
-            bug("[CocoaGfx] Failed to create BitMap class\n");
-            goto fail;
-        }
-        xsd.bmclass->UserData = &xsd;
-    }
-
-    /* Register GFX class as public */
-    OOP_AddClass(xsd.gfxclass);
-
-    /* Register with graphics.library */
-    GfxBase = (struct GfxBase *)OpenLibrary("graphics.library", 41);
-    if (!GfxBase) {
-        bug("[CocoaGfx] Can't open graphics.library\n");
-        goto fail;
-    }
-
-    err = AddDisplayDriverA(xsd.gfxclass, NULL, NULL);
-    bug("[CocoaGfx] AddDisplayDriverA = %d\n", (int)err);
-    CloseLibrary((struct Library *)GfxBase);
-
-    if (err) goto fail;
-
-    /* Stay resident */
-    bug("[CocoaGfx] Driver registered, staying resident\n");
-    {
-        struct Process *me = (struct Process *)FindTask(NULL);
-        if (me->pr_CLI) {
-            struct CommandLineInterface *cli = BADDR(me->pr_CLI);
-            cli->cli_Module = BNULL;
-        } else {
-            me->pr_SegList = BNULL;
-        }
-    }
+    /* Stay resident - don't exit or classes will be freed */
+    Wait(0);
     return 0;
-
-fail:
-    if (xsd.bmclass) OOP_DisposeObject((OOP_Object *)xsd.bmclass);
-    if (xsd.gfxclass) OOP_DisposeObject((OOP_Object *)xsd.gfxclass);
-    CloseLibrary(UtilityBase);
-    CloseLibrary(OOPBase);
-    return 20;
 }

@@ -81,13 +81,13 @@ void __dos_Boot(struct DosLibrary *DOSBase, ULONG BootFlags, UBYTE Flags)
         if (seg) {
             struct Process *proc = CreateNewProcTags(
                 NP_Seglist, (IPTR)seg,
-                NP_FreeSeglist, TRUE,
+                NP_FreeSeglist, FALSE,
                 NP_Name, (IPTR)"Cocoa Display",
                 NP_Priority, 0,
+                NP_WindowPtr, (IPTR)-1,
                 TAG_DONE);
             bug("[DOS] Cocoa display process=%p\n", proc);
-            /* Give it time to initialize */
-            Delay(50);
+            Delay(200);
             bug("[DOS] Opening screen...\n");
             {
                 struct Library *IntuitionBase = OpenLibrary("intuition.library", 0);
