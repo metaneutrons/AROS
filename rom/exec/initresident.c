@@ -66,8 +66,6 @@
     
     DINITRESIDENT("InitResident begin 0x%p (\"%s\")", resident, resident->rt_Name);
 
-    bug("[InitResident] %s (flags=%02x pri=%d)\n", resident->rt_Name, resident->rt_Flags, resident->rt_Pri);
-
     /* Check for validity */
     if(resident->rt_MatchWord != RTC_MATCHWORD ||
        resident->rt_MatchTag != resident)
@@ -88,18 +86,12 @@
 
         DINITRESIDENT("InitResident RTF_AUTOINIT");
 
-        bug("[InitResident] AUTOINIT: rt_Init=%p\n", resident->rt_Init);
-        bug("[InitResident] AUTOINIT: vectors=%p structure=%p dSize=%lu init=%p\n",
-            init->vectors, init->structure, (unsigned long)init->dSize, init->init);
-
         /*
             Make the library. Don't call the Init routine yet, but delay
             that until we can copy stuff from the tag to the libbase.
         */
         library = MakeLibrary(init->vectors, init->structure,
                               NULL, init->dSize, segList);
-
-        bug("[InitResident] MakeLibrary -> %p\n", library);
 
         if(library != NULL)
         {
@@ -175,8 +167,6 @@
     }
 
     DINITRESIDENT("InitResident end 0x%p (\"%s\"), result 0x%p", resident, resident->rt_Name, library);
-
-    bug("[InitResident] %s -> %p\n", resident->rt_Name, library);
         
     return library;
 

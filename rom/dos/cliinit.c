@@ -112,7 +112,6 @@ static LONG internalBootCliHandler(void);
 
     reply_mp = CreateMsgPort();
     seg = CreateSegList(internalBootCliHandler);
-    bug("[CliInit] dp=%p mp=%p seg=0x%lx\n", dp, reply_mp, (unsigned long)seg);
     if (dp == NULL || reply_mp == NULL || seg == BNULL) {
         if (my_dp)
             FreeDosObject(DOS_STDPKT, my_dp);
@@ -518,7 +517,6 @@ static LONG internalBootCliHandler(void)
 
         /* Find and Lock the proposed boot device */
         lock = internalBootLock(DOSBase, ExpansionBase, fsr);
-        bug("[BootCli] internalBootLock returned %p, IoErr=%ld\n", BADDR(lock), (long)IoErr());
         D(bug("Dos/CliInit: Proposed SYS: lock is: %p\n", BADDR(lock)));
         if (lock == BNULL)
             err = IoErr();
@@ -619,7 +617,7 @@ static LONG internalBootCliHandler(void)
 
     /* Init all the RTF_AFTERDOS code, since we now have SYS:, the dos devices, and all the other assigns */
     D(bug("Dos/CliInit: Calling InitCode(RTF_AFTERDOS, 0)\n"));
-    bug("[BootCli] InitCode(RTF_AFTERDOS)...\n"); InitCode(RTF_AFTERDOS, 0); bug("[BootCli] InitCode(RTF_AFTERDOS) done\n");
+    InitCode(RTF_AFTERDOS, 0);
 
     /* Call the platform-overridable portions */
     D(bug("Dos/CliInit: Calling __dos_Boot(%p, 0x%lx, 0x%x)\n", DOSBase, BootFlags, Flags));

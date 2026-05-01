@@ -139,12 +139,7 @@ AROS_UFH3S(struct DosLibrary *, DosInit,
         SysBase = sysBase;
 
     if (!set_call_funcs(SETNAME(INIT), 1, 1))
-    {
-        bug("[DosInit] set_call_funcs(INIT) failed!\n");
         return NULL;
-    }
-
-    bug("[DosInit] INIT set OK\n");
 
     DOSBase = (struct DosLibrary *)FindName(&SysBase->LibList, "dos.library");
 
@@ -267,7 +262,6 @@ AROS_UFH3S(struct DosLibrary *, DosInit,
     }
 
     /* Try to boot */
-    bug("[DosInit] Calling CliInit...\n");
     if (CliInit(NULL) == RETURN_OK)
     {
         /*
