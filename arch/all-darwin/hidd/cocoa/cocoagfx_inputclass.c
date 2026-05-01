@@ -18,6 +18,10 @@
 #include "cocoa_intern.h"
 #include "hostinterface.h"
 
+/* AttrBase for input - defined in startup.c */
+extern OOP_AttrBase __abHidd_Input;
+#define HiddInputAB __abHidd_Input
+
 /* ======== Mouse class ======== */
 
 struct CocoaMouseData {
