@@ -17,6 +17,9 @@
 #include <dos/dos.h>
 #include <hidd/gfx.h>
 #include <hidd/hidd.h>
+#include <hidd/input.h>
+#include <hidd/mouse.h>
+#include <hidd/keyboard.h>
 #include <oop/oop.h>
 #include <utility/tagitem.h>
 #include <proto/exec.h>
@@ -164,7 +167,67 @@ int main(void)
         }
     }
 
-    /* Input registration - disabled pending investigation */
+    /* Register input drivers */
+    {
+        extern struct OOP_InterfaceDescr CocoaMouse_ifdescr[];
+        extern struct OOP_InterfaceDescr CocoaKbd_ifdescr[];
+        extern void cocoa_input_set_objects(OOP_Object *mouse, OOP_Object *kbd);
+        extern void cocoa_input_poll(struct HostInterface *hif);
+
+        struct TagItem mtags[] = {
+            { aMeta_SuperID,        (IPTR)CLID_Hidd },
+            { aMeta_InterfaceDescr, (IPTR)CocoaMouse_ifdescr },
+            { aMeta_ID,             (IPTR)"hidd.mouse.cocoa" },
+            { aMeta_InstSize,       16 },
+            { TAG_DONE, 0 }
+        };
+        struct TagItem ktags[] = {
+            { aMeta_SuperID,        (IPTR)CLID_Hidd },
+            { aMeta_InterfaceDescr, (IPTR)CocoaKbd_ifdescr },
+            { aMeta_ID,             (IPTR)"hidd.kbd.cocoa" },
+            { aMeta_InstSize,       16 },
+            { TAG_DONE, 0 }
+        };
+
+        OOP_Class *mouseclass = OOP_NewObject(NULL, CLID_HiddMeta, mtags);
+        OOP_Class *kbdclass = OOP_NewObject(NULL, CLID_HiddMeta, ktags);
+
+        if (mouseclass && kbdclass) {
+            OOP_AddClass(mouseclass);
+            OOP_AddClass(kbdclass);
+
+            OOP_Object *kbd = OOP_NewObject(NULL, CLID_Hidd_Kbd, NULL);
+            OOP_Object *ms  = OOP_NewObject(NULL, CLID_Hidd_Mouse, NULL);
+
+            if (ms && kbd) {
+                struct TagItem mstags[] = {{ TAG_DONE, 0 }};
+                struct TagItem kbtags[] = {{ TAG_DONE, 0 }};
+
+                OOP_MethodID inputMID = OOP_GetMethodID(IID_Hidd_Input, 0);
+                struct pHidd_Input_AddHardwareDriver amsg;
+                OOP_Object *msdriver, *kbdriver;
+
+                amsg.mID = inputMID + moHidd_Input_AddHardwareDriver;
+                amsg.driverClass = mouseclass;
+                amsg.tags = mstags;
+                msdriver = (OOP_Object *)OOP_DoMethod(ms, (OOP_Msg)&amsg);
+
+                amsg.driverClass = kbdclass;
+                amsg.tags = kbtags;
+                kbdriver = (OOP_Object *)OOP_DoMethod(kbd, (OOP_Msg)&amsg);
+
+                if (msdriver || kbdriver) {
+                    cocoa_input_set_objects(msdriver, kbdriver);
+                    /* Poll loop */
+                    for (;;) {
+                        cocoa_input_poll(HostIFace);
+                        Delay(1);
+                    }
+                }
+            }
+        }
+    }
+
     Wait(0);
     return 0;
 }
