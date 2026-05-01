@@ -9,6 +9,7 @@
 #import <IOSurface/IOSurface.h>
 #import <QuartzCore/QuartzCore.h>
 #include <pthread.h>
+#include <stdlib.h>
 
 /* C API */
 #ifdef __cplusplus
@@ -46,11 +47,27 @@ static void         *g_pixels     = NULL;
 
 - (void)updateLayer {
     if (g_surface) {
+        /* Lock the surface so CoreAnimation can read it */
+        IOSurfaceLock(g_surface, kIOSurfaceLockReadOnly, NULL);
         self.layer.contents = (__bridge id)g_surface;
+        IOSurfaceUnlock(g_surface, kIOSurfaceLockReadOnly, NULL);
     }
 }
 
 - (BOOL)isOpaque { return YES; }
+
+@end
+
+/* ---------- Window Delegate ---------- */
+
+@interface AROSWindowDelegate : NSObject <NSWindowDelegate>
+@end
+
+@implementation AROSWindowDelegate
+
+- (void)windowWillClose:(NSNotification *)notification {
+    _exit(0);
+}
 
 @end
 
@@ -114,6 +131,7 @@ void *cocoa_display_init(int width, int height) {
 
         [g_window setTitle:@"AROS"];
         [g_window center];
+        [g_window setDelegate:[[AROSWindowDelegate alloc] init]];
 
         /* Create layer-backed view */
         g_view = [[AROSView alloc] initWithFrame:frame];
@@ -176,5 +194,8 @@ void cocoa_runloop_step(void) {
         }
         /* Refresh display each step */
         [g_view.layer setNeedsDisplay];
+        [CATransaction flush];
+        /* Small sleep to avoid spinning and allow display to update */
+        [NSThread sleepForTimeInterval:0.016]; /* ~60fps */
     }
 }

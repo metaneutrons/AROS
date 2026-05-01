@@ -41,11 +41,13 @@ extern OOP_AttrBase __IHidd_BitMap;
 extern OOP_AttrBase __IHidd_Gfx;
 extern OOP_AttrBase __IHidd_Sync;
 extern OOP_AttrBase __IHidd_PixFmt;
+extern OOP_AttrBase __IHidd_ChunkyBM;
 
 /* Attribute base shortcuts used by IS_GFX_ATTR etc. */
 #define HiddBitMapAttrBase  __IHidd_BitMap
 #define HiddGfxAttrBase     __IHidd_Gfx
 #define HiddSyncAttrBase    __IHidd_Sync
 #define HiddPixFmtAttrBase  __IHidd_PixFmt
+#define HiddChunkyBMAttrBase __IHidd_ChunkyBM
 
 #endif /* COCOA_INTERN_H */

@@ -113,8 +113,8 @@ OOP_Object *CocoaGfx__Hidd_Gfx__CreateObject(OOP_Class *cl, OOP_Object *o,
 
         if (is_fb || (modeid != vHidd_ModeID_Invalid)) {
             struct TagItem bmtags[] = {
-                { aHidd_BitMap_ClassPtr, (IPTR)csd->bmclass },
-                { TAG_MORE,             (IPTR)msg->attrList },
+                { aHidd_BitMap_ClassPtr,    (IPTR)csd->bmclass },
+                { TAG_MORE,                (IPTR)msg->attrList },
                 { TAG_DONE, 0 }
             };
 

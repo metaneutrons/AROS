@@ -45,6 +45,7 @@ OOP_AttrBase __IHidd_BitMap;
 OOP_AttrBase __IHidd_Gfx;
 OOP_AttrBase __IHidd_Sync;
 OOP_AttrBase __IHidd_PixFmt;
+OOP_AttrBase __IHidd_ChunkyBM;
 
 int __nocommandline = 1;
 int __noinitexitsets = 1;
@@ -120,6 +121,7 @@ int main(void)
                         __IHidd_Gfx   = OOP_ObtainAttrBase(IID_Hidd_Gfx);
                         __IHidd_Sync  = OOP_ObtainAttrBase(IID_Hidd_Sync);
                         __IHidd_PixFmt= OOP_ObtainAttrBase(IID_Hidd_PixFmt);
+                        __IHidd_ChunkyBM = OOP_ObtainAttrBase(IID_Hidd_ChunkyBM);
 
                         xsd.hiddBitMapAttrBase = __IHidd_BitMap;
                         xsd.hiddGfxAttrBase    = __IHidd_Gfx;
@@ -135,7 +137,7 @@ int main(void)
                                 { TAG_DONE, 0 }
                             };
                             struct TagItem btags[] = {
-                                { aMeta_SuperID,        (IPTR)CLID_Hidd_BitMap },
+                                { aMeta_SuperID,        (IPTR)CLID_Hidd_ChunkyBM },
                                 { aMeta_InterfaceDescr, (IPTR)CocoaBM_ifdescr },
                                 { aMeta_InstSize,       sizeof(struct CocoaBMData) },
                                 { TAG_DONE, 0 }

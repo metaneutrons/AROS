@@ -134,33 +134,7 @@ int __startup startup(struct TagItem *msg, ULONG magic)
     HostIFace = hif;
 
 #if defined(__APPLE__) && defined(__aarch64__)
-    /* Draw color bars to the Cocoa framebuffer as a display test */
-    if (HostIFace->cocoa_fb_base) {
-        unsigned int *fb = (unsigned int *)HostIFace->cocoa_fb_base;
-        int w = HostIFace->cocoa_fb_width;
-        int h = HostIFace->cocoa_fb_height;
-        int pitch = HostIFace->cocoa_fb_pitch / 4;
-        int x, y;
-        for (y = 0; y < h; y++) {
-            for (x = 0; x < w; x++) {
-                unsigned int c;
-                int bar = x * 8 / w;
-                switch (bar) {
-                    case 0: c = 0xFFFFFFFF; break;
-                    case 1: c = 0xFF00FFFF; break;
-                    case 2: c = 0xFFFFFF00; break;
-                    case 3: c = 0xFF00FF00; break;
-                    case 4: c = 0xFFFF00FF; break;
-                    case 5: c = 0xFF0000FF; break;
-                    case 6: c = 0xFFFF0000; break;
-                    default: c = 0xFF000000; break;
-                }
-                fb[y * pitch + x] = c;
-            }
-        }
-        if (HostIFace->cocoa_display_refresh)
-            HostIFace->cocoa_display_refresh();
-    }
+    /* Cocoa framebuffer is ready - AROS graphics will render to it */
 #endif
 
     /* If there's no proper HostIFace, we can't even say anything */
