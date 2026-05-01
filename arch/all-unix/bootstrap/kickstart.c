@@ -34,6 +34,7 @@ int pthread_detach(pthread_t_host);
 extern void *cocoa_display_init(int width, int height);
 extern int   cocoa_display_get_pitch(void);
 extern void  cocoa_runloop_step(void);
+extern void  cocoa_set_hiface(void *hiface);
 
 struct kick_args {
     kernel_entry_fun_t addr;
@@ -66,6 +67,7 @@ int kick(kernel_entry_fun_t addr, struct TagItem *msg)
         hi->cocoa_fb_width = 640;
         hi->cocoa_fb_height = 480;
         hi->cocoa_fb_pitch = cocoa_display_get_pitch();
+        cocoa_set_hiface(hi);
         fprintf(stderr, "[Bootstrap] Framebuffer at %p, %dx%d pitch=%d\n",
                 fb, 640, 480, hi->cocoa_fb_pitch);
     }

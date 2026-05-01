@@ -77,6 +77,9 @@ static struct HostInterface _HostIFace =
     0,     /* cocoa_fb_width */
     0,     /* cocoa_fb_height */
     0,     /* cocoa_fb_pitch */
+    0,     /* cocoa_event_write */
+    0,     /* cocoa_event_read */
+    {{0}}  /* cocoa_events */
 #else
     NULL,
     NULL,

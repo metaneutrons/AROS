@@ -27,6 +27,17 @@ struct HostInterface
     int    cocoa_fb_width;
     int    cocoa_fb_height;
     int    cocoa_fb_pitch;
+
+    /* Input event ring buffer (written by Cocoa, read by AROS) */
+    #define COCOA_EVENT_RING_SIZE 64
+    #define COCOA_EVENT_MOUSE_MOVE   1
+    #define COCOA_EVENT_MOUSE_PRESS  2
+    #define COCOA_EVENT_MOUSE_RELEASE 3
+    #define COCOA_EVENT_KEY_PRESS    4
+    #define COCOA_EVENT_KEY_RELEASE  5
+    volatile int cocoa_event_write;
+    volatile int cocoa_event_read;
+    struct { int type; int x, y; int button; int keycode; } cocoa_events[COCOA_EVENT_RING_SIZE];
 };
 
 #endif /* !_HOSTINTERFACE_H */

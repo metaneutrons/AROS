@@ -21,6 +21,7 @@ int   cocoa_display_get_pitch(void);
 void  cocoa_display_refresh(void);
 void  cocoa_display_shutdown(void);
 void  cocoa_runloop_step(void);
+void  cocoa_set_hiface(void *hiface);
 
 #ifdef __cplusplus
 }
@@ -36,6 +37,25 @@ static int           g_height     = 0;
 static int           g_pitch      = 0;
 static void         *g_pixels     = NULL;
 
+/* ---------- Input Event Helpers ---------- */
+
+#include "hostinterface.h"
+
+static struct HostInterface *g_hiface = NULL;
+
+static void push_event(int type, int x, int y, int button, int keycode) {
+    if (!g_hiface) return;
+    int wr = g_hiface->cocoa_event_write;
+    int next = (wr + 1) % COCOA_EVENT_RING_SIZE;
+    if (next == g_hiface->cocoa_event_read) return; /* full, drop */
+    g_hiface->cocoa_events[wr].type = type;
+    g_hiface->cocoa_events[wr].x = x;
+    g_hiface->cocoa_events[wr].y = y;
+    g_hiface->cocoa_events[wr].button = button;
+    g_hiface->cocoa_events[wr].keycode = keycode;
+    g_hiface->cocoa_event_write = next;
+}
+
 /* ---------- View ---------- */
 
 @interface AROSView : NSView
@@ -47,7 +67,6 @@ static void         *g_pixels     = NULL;
 
 - (void)updateLayer {
     if (g_surface) {
-        /* Lock the surface so CoreAnimation can read it */
         IOSurfaceLock(g_surface, kIOSurfaceLockReadOnly, NULL);
         self.layer.contents = (__bridge id)g_surface;
         IOSurfaceUnlock(g_surface, kIOSurfaceLockReadOnly, NULL);
@@ -55,6 +74,46 @@ static void         *g_pixels     = NULL;
 }
 
 - (BOOL)isOpaque { return YES; }
+- (BOOL)acceptsFirstResponder { return YES; }
+
+- (NSPoint)convertToFB:(NSEvent *)event {
+    NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+    /* Flip Y (Cocoa is bottom-up, AROS is top-down) */
+    p.y = g_height - p.y;
+    return p;
+}
+
+- (void)mouseMoved:(NSEvent *)event {
+    NSPoint p = [self convertToFB:event];
+    push_event(COCOA_EVENT_MOUSE_MOVE, (int)p.x, (int)p.y, 0, 0);
+}
+- (void)mouseDragged:(NSEvent *)event { [self mouseMoved:event]; }
+- (void)rightMouseDragged:(NSEvent *)event { [self mouseMoved:event]; }
+- (void)otherMouseDragged:(NSEvent *)event { [self mouseMoved:event]; }
+
+- (void)mouseDown:(NSEvent *)event {
+    NSPoint p = [self convertToFB:event];
+    push_event(COCOA_EVENT_MOUSE_PRESS, (int)p.x, (int)p.y, 1, 0);
+}
+- (void)mouseUp:(NSEvent *)event {
+    NSPoint p = [self convertToFB:event];
+    push_event(COCOA_EVENT_MOUSE_RELEASE, (int)p.x, (int)p.y, 1, 0);
+}
+- (void)rightMouseDown:(NSEvent *)event {
+    NSPoint p = [self convertToFB:event];
+    push_event(COCOA_EVENT_MOUSE_PRESS, (int)p.x, (int)p.y, 2, 0);
+}
+- (void)rightMouseUp:(NSEvent *)event {
+    NSPoint p = [self convertToFB:event];
+    push_event(COCOA_EVENT_MOUSE_RELEASE, (int)p.x, (int)p.y, 2, 0);
+}
+
+- (void)keyDown:(NSEvent *)event {
+    push_event(COCOA_EVENT_KEY_PRESS, 0, 0, 0, [event keyCode]);
+}
+- (void)keyUp:(NSEvent *)event {
+    push_event(COCOA_EVENT_KEY_RELEASE, 0, 0, 0, [event keyCode]);
+}
 
 @end
 
@@ -141,6 +200,7 @@ void *cocoa_display_init(int width, int height) {
 
         [g_window setContentView:g_view];
         [g_window makeKeyAndOrderFront:nil];
+        [g_window setAcceptsMouseMovedEvents:YES];
         [NSApp activateIgnoringOtherApps:YES];
 
         /* Initial display */
@@ -181,6 +241,10 @@ void cocoa_display_shutdown(void) {
         g_view = nil;
         g_pixels = NULL;
     }
+}
+
+void cocoa_set_hiface(void *hiface) {
+    g_hiface = (struct HostInterface *)hiface;
 }
 
 void cocoa_runloop_step(void) {

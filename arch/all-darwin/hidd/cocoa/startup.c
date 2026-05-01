@@ -17,6 +17,9 @@
 #include <dos/dos.h>
 #include <hidd/gfx.h>
 #include <hidd/hidd.h>
+#include <hidd/input.h>
+#include <hidd/mouse.h>
+#include <hidd/keyboard.h>
 #include <oop/oop.h>
 #include <utility/tagitem.h>
 #include <proto/exec.h>
@@ -46,6 +49,7 @@ OOP_AttrBase __IHidd_Gfx;
 OOP_AttrBase __IHidd_Sync;
 OOP_AttrBase __IHidd_PixFmt;
 OOP_AttrBase __IHidd_ChunkyBM;
+OOP_AttrBase __abHidd_Input;
 
 int __nocommandline = 1;
 int __noinitexitsets = 1;
@@ -122,6 +126,7 @@ int main(void)
                         __IHidd_Sync  = OOP_ObtainAttrBase(IID_Hidd_Sync);
                         __IHidd_PixFmt= OOP_ObtainAttrBase(IID_Hidd_PixFmt);
                         __IHidd_ChunkyBM = OOP_ObtainAttrBase(IID_Hidd_ChunkyBM);
+                        __abHidd_Input = OOP_ObtainAttrBase(IID_Hidd_Input);
 
                         xsd.hiddBitMapAttrBase = __IHidd_BitMap;
                         xsd.hiddGfxAttrBase    = __IHidd_Gfx;
@@ -164,7 +169,61 @@ int main(void)
         }
     }
 
+    /* TODO: Input registration - disabled for now, needs debugging */
+#if 0
+        extern struct OOP_InterfaceDescr CocoaMouse_ifdescr[];
+        extern struct OOP_InterfaceDescr CocoaKbd_ifdescr[];
+        extern void cocoa_input_set_objects(OOP_Object *mouse, OOP_Object *kbd);
+        extern void cocoa_input_poll(struct HostInterface *hif);
+
+        struct TagItem mtags[] = {
+            { aMeta_SuperID,        (IPTR)CLID_Hidd },
+            { aMeta_InterfaceDescr, (IPTR)CocoaMouse_ifdescr },
+            { aMeta_ID,             (IPTR)"hidd.mouse.cocoa" },
+            { aMeta_InstSize,       16 }, /* CocoaMouseData: 2 pointers */
+            { TAG_DONE, 0 }
+        };
+        struct TagItem ktags[] = {
+            { aMeta_SuperID,        (IPTR)CLID_Hidd },
+            { aMeta_InterfaceDescr, (IPTR)CocoaKbd_ifdescr },
+            { aMeta_ID,             (IPTR)"hidd.kbd.cocoa" },
+            { aMeta_InstSize,       16 }, /* CocoaKbdData: 2 pointers */
+            { TAG_DONE, 0 }
+        };
+
+        OOP_Class *mouseclass = OOP_NewObject(NULL, CLID_HiddMeta, mtags);
+        OOP_Class *kbdclass = OOP_NewObject(NULL, CLID_HiddMeta, ktags);
+
+        if (mouseclass && kbdclass) {
+            OOP_AddClass(mouseclass);
+            OOP_AddClass(kbdclass);
+
+            /* Register with input subsystem */
+            OOP_Object *kbd = OOP_NewObject(NULL, CLID_Hidd_Kbd, NULL);
+            OOP_Object *ms  = OOP_NewObject(NULL, CLID_Hidd_Mouse, NULL);
+
+            if (kbd && ms) {
+                struct TagItem kbtags[] = {{ aHidd_HardwareName, (IPTR)"Cocoa Keyboard" }, { TAG_DONE, 0 }};
+                struct TagItem mstags[] = {{ aHidd_HardwareName, (IPTR)"Cocoa Mouse" }, { TAG_DONE, 0 }};
+
+                OOP_Object *kbdriver = HIDD_Input_AddHardwareDriver(kbd, kbdclass, kbtags);
+                OOP_Object *msdriver = HIDD_Input_AddHardwareDriver(ms, mouseclass, mstags);
+
+                if (msdriver && kbdriver) {
+                    cocoa_input_set_objects(msdriver, kbdriver);
+
+                    /* Poll loop - process input events */
+                    for (;;) {
+                        cocoa_input_poll(HostIFace);
+                        Delay(1); /* ~20ms */
+                    }
+                }
+            }
+        }
+    }
+
     /* Stay resident - don't exit or classes will be freed */
+#endif
     Wait(0);
     return 0;
 }
