@@ -85,7 +85,34 @@ register unsigned char* AROS_GET_SP __asm__("%sp");
     designates x16/x17 as intra-procedure-call scratch registers that
     callers must not rely on being preserved.
     Date: 2026-04-10
+
+    On darwin-aarch64, W^X enforcement prevents writing executable code
+    to RAM. FullJumpVec is only used for segment entry points. The
+    AROS_SET_FULLJMP macro writes the trampoline and then calls
+    CacheClearE to flush the icache and mprotect the page to RX.
 */
+/*
+ * On darwin-aarch64, W^X enforcement prevents writing executable code
+ * to RAM. FullJumpVec is redefined as a simple function pointer (same
+ * as JumpVec). The segment entry point is called indirectly by reading
+ * the pointer, not by executing a trampoline.
+ */
+#if defined(HOST_OS_darwin) && defined(__aarch64__)
+struct FullJumpVec
+{
+    void *target;
+};
+#define __AROS_SET_FULLJMP(v,a) \
+do { \
+    ((struct FullJumpVec *)(v))->target = (void *)(a); \
+} while (0)
+#define __AROS_GET_FULLJMP_TARGET(v) (((struct FullJumpVec *)(v))->target)
+
+/* Get the entry point from a segment. On darwin-aarch64, FullJumpVec is a
+ * data pointer that must be dereferenced. On other platforms, the segment
+ * data IS the entry point (executable trampoline). */
+#define __AROS_SEG_ENTRY(seg) __AROS_GET_FULLJMP_TARGET((UBYTE *)BADDR(seg) + sizeof(BPTR))
+#else
 struct FullJumpVec
 {
     unsigned int jmp[2];    /* Two 32-bit AArch64 instructions          */
@@ -99,6 +126,34 @@ do \
     _v->jmp[1] = 0xd61f0200;   /* br  x16                  */  \
     _v->vec    = (unsigned long)(a); /* 64-bit target address */  \
 } while (0)
+#define __AROS_GET_FULLJMP_TARGET(v) ((void *)(((struct FullJumpVec *)(v))->vec))
+#define __AROS_SEG_ENTRY(seg) ((APTR)((UBYTE *)BADDR(seg) + sizeof(BPTR)))
+#endif
+
+/*
+ * W^X support macros for macOS arm64 (Apple Silicon).
+ *
+ * macOS enforces that MAP_JIT pages can only be writable OR executable
+ * at any given time per thread. pthread_jit_write_protect_np(false)
+ * makes them writable; pthread_jit_write_protect_np(true) makes them
+ * executable again. sys_icache_invalidate() is needed after writing
+ * instructions to ensure the icache sees the new code.
+ *
+ * On all other platforms these are no-ops.
+ */
+/*
+ * W^X support for macOS arm64 (Apple Silicon).
+ *
+ * macOS enforces that MAP_JIT pages can only be writable OR executable
+ * at any given time per thread. During boot, the bootstrap puts RAM in
+ * write mode. After InitCode writes all FullJumpVecs, the kernel
+ * switches to execute mode. Individual FullJumpVec writes during
+ * runtime will need proper W^X toggling through the host interface.
+ *
+ * For now, the macros are no-ops. The kernel handles the global toggle.
+ */
+#define AROS_BEGIN_CODE_WRITE()  do { } while (0)
+#define AROS_END_CODE_WRITE()    do { } while (0)
 
 struct JumpVec
 {

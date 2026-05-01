@@ -28,6 +28,20 @@ static inline int Strcmp(const char *a, const char *b) { return strcmp(a, b); }
 #define DREL(x)
 #define DSYM(x)
 
+#ifdef __aarch64__
+/* GOT for bootstrap AArch64 ELF loading — allocated in the RO region
+ * so that PC-relative adrp instructions can reach it from loaded code. */
+#define AARCH64_GOT_MAX 256
+static uintptr_t *bootstrap_aarch64_got = NULL;
+static int bootstrap_aarch64_got_count = 0;
+
+void elfloader_SetGOT(void *got_base)
+{
+    bootstrap_aarch64_got = (uintptr_t *)got_base;
+    bootstrap_aarch64_got_count = 0;
+}
+#endif
+
 /* Use own definitions because we may be compiled as 32-bit code but build structures for 64-bit code */
 struct ELF_ModuleInfo_t
 {
@@ -221,7 +235,7 @@ static int relocate(struct elfheader *eh, struct sheader *sh, long shrel_idx, el
         DREL(kprintf("[ELF Loader] Relocating symbol %s, type ", sym->name ? name : "<unknown>");)
         switch (ELF_R_TYPE(rel->info))
         {
-#ifdef ELF_64BIT
+#if defined(ELF_64BIT) && (defined(__x86_64__) || defined(__amd64__))
         case R_X86_64_64: /* 64bit direct/absolute */
             *(uint64_t *)p = s + rel->addend;
             break;
@@ -388,6 +402,110 @@ static int relocate(struct elfheader *eh, struct sheader *sh, long shrel_idx, el
 
         case R_ARM_NONE:
             break;
+#endif
+#ifdef __aarch64__
+        case R_AARCH64_ABS64:
+            *(uint64_t *)p = rel->addend + s;
+            /* Debug: check for suspiciously small values in .rodata relocations */
+            if ((rel->addend + s) != 0 && (rel->addend + s) < 0x10000)
+                kprintf("[ELF Loader] WARNING: ABS64 reloc -> 0x%lx at %p (sym=%s s=0x%lx addend=0x%lx)\n",
+                        (unsigned long)(rel->addend + s), p, name, (unsigned long)s, (unsigned long)rel->addend);
+            break;
+
+        case R_AARCH64_ABS32:
+            *(uint32_t *)p = (uint32_t)(rel->addend + s);
+            break;
+
+        case R_AARCH64_PREL32:
+            *(int32_t *)p = (int32_t)(rel->addend + s - (uintptr_t)p);
+            break;
+
+        case R_AARCH64_CALL26:
+        case R_AARCH64_JUMP26:
+        {
+            int32_t offset = (int32_t)(rel->addend + s - (uintptr_t)p);
+            offset >>= 2;
+            *(uint32_t *)p = (*(uint32_t *)p & 0xFC000000) | (offset & 0x03FFFFFF);
+            break;
+        }
+
+        case R_AARCH64_ADR_PREL_PG_HI21:
+        {
+            int64_t offset = (int64_t)((rel->addend + s) & ~0xFFF) - ((uintptr_t)p & ~0xFFF);
+            int32_t imm = (int32_t)(offset >> 12);
+            uint32_t immlo = (imm & 3) << 29;
+            uint32_t immhi = ((imm >> 2) & 0x7FFFF) << 5;
+            *(uint32_t *)p = (*(uint32_t *)p & 0x9F00001F) | immlo | immhi;
+            break;
+        }
+
+        case R_AARCH64_ADD_ABS_LO12_NC:
+        case R_AARCH64_LDST8_ABS_LO12_NC:
+        {
+            uint32_t imm12 = (uint32_t)((rel->addend + s) & 0xFFF);
+            *(uint32_t *)p = (*(uint32_t *)p & 0xFFC003FF) | (imm12 << 10);
+            break;
+        }
+
+        case R_AARCH64_LDST16_ABS_LO12_NC:
+        {
+            uint32_t imm12 = (uint32_t)(((rel->addend + s) & 0xFFF) >> 1);
+            *(uint32_t *)p = (*(uint32_t *)p & 0xFFC003FF) | (imm12 << 10);
+            break;
+        }
+
+        case R_AARCH64_LDST32_ABS_LO12_NC:
+        {
+            uint32_t imm12 = (uint32_t)(((rel->addend + s) & 0xFFF) >> 2);
+            *(uint32_t *)p = (*(uint32_t *)p & 0xFFC003FF) | (imm12 << 10);
+            break;
+        }
+
+        case R_AARCH64_LDST64_ABS_LO12_NC:
+        {
+            uint32_t imm12 = (uint32_t)(((rel->addend + s) & 0xFFF) >> 3);
+            *(uint32_t *)p = (*(uint32_t *)p & 0xFFC003FF) | (imm12 << 10);
+            break;
+        }
+
+        case R_AARCH64_LDST128_ABS_LO12_NC:
+        {
+            uint32_t imm12 = (uint32_t)(((rel->addend + s) & 0xFFF) >> 4);
+            *(uint32_t *)p = (*(uint32_t *)p & 0xFFC003FF) | (imm12 << 10);
+            break;
+        }
+
+        case R_AARCH64_NONE:
+            break;
+
+        case R_AARCH64_ADR_GOT_PAGE:
+        {
+            if (!bootstrap_aarch64_got || bootstrap_aarch64_got_count >= AARCH64_GOT_MAX) {
+                kprintf("[ELF Loader] GOT overflow or not initialized (%d, %p)\n",
+                        bootstrap_aarch64_got_count, bootstrap_aarch64_got);
+                return 0;
+            }
+            bootstrap_aarch64_got[bootstrap_aarch64_got_count] = rel->addend + s;
+            uintptr_t got_addr = (uintptr_t)&bootstrap_aarch64_got[bootstrap_aarch64_got_count];
+            kprintf("[ELF Loader] GOT[%d]: addr=%p val=%p (sym+addend) p=%p\n",
+                    bootstrap_aarch64_got_count, (void*)got_addr,
+                    (void*)(rel->addend + s), p);
+            bootstrap_aarch64_got_count++;
+            int64_t goffset = (int64_t)(got_addr & ~0xFFF) - ((uintptr_t)p & ~0xFFF);
+            int32_t gimm = (int32_t)(goffset >> 12);
+            uint32_t gimmlo = (gimm & 3) << 29;
+            uint32_t gimmhi = ((gimm >> 2) & 0x7FFFF) << 5;
+            *(uint32_t *)p = (*(uint32_t *)p & 0x9F00001F) | gimmlo | gimmhi;
+            break;
+        }
+
+        case R_AARCH64_LD64_GOT_LO12_NC:
+        {
+            uintptr_t got_addr = (uintptr_t)&bootstrap_aarch64_got[bootstrap_aarch64_got_count - 1];
+            uint32_t gimm12 = (uint32_t)((got_addr & 0xFFF) >> 3);
+            *(uint32_t *)p = (*(uint32_t *)p & 0xFFC003FF) | (gimm12 << 10);
+            break;
+        }
 #endif
         default:
             kprintf("[ELF Loader] Unknown relocation #%d type %ld\n", i, (long)ELF_R_TYPE(rel->info));
