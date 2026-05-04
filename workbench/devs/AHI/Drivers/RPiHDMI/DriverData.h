@@ -21,12 +21,21 @@ struct DMAControlBlock {
 };
 
 /*
+ * SoC variant for register offset selection
+ */
+enum RPiHDMIVariant {
+    VARIANT_BCM2835 = 0,  /* RPi 1/2/3: peribase 0x20000000 / 0x3F000000 */
+    VARIANT_BCM2711 = 1,  /* RPi 4:     peribase 0xFE000000 */
+};
+
+/*
  * Driver library base
  */
 struct RPiHDMIBase {
     struct DriverBase driverbase;
     struct DosLibrary *dosbase;
-    ULONG periiobase;
+    IPTR periiobase;
+    enum RPiHDMIVariant variant;
 };
 
 #define DRIVERBASE_SIZEOF (sizeof(struct RPiHDMIBase))
@@ -47,8 +56,14 @@ struct RPiHDMIData {
     struct RPiHDMIBase *ahisubbase;
 
     /* Hardware state */
-    ULONG periiobase;
+    IPTR periiobase;
+    enum RPiHDMIVariant variant;
     ULONG dma_channel;
+
+    /* Register base addresses (computed from periiobase + variant) */
+    IPTR hd_base;    /* HD block (MAI registers) */
+    IPTR hdmi_base;  /* HDMI core block */
+    IPTR ram_base;   /* RAM packet block (BCM2711: separate; BCM2835: inside hdmi_base) */
 
     /* DMA control blocks (32-byte aligned) */
     struct DMAControlBlock *cb_base; /* Allocated block (for free) */
@@ -66,10 +81,10 @@ struct RPiHDMIData {
     /* Configuration */
     ULONG samplerate;
 
-    /* IEC958 state — separate channel status for L and R per IEC 60958-3 */
-    UBYTE channel_status_l[24]; /* Left channel status block (192 bits) */
-    UBYTE channel_status_r[24]; /* Right channel status block (192 bits) */
-    ULONG frame_counter;        /* Current frame within IEC958 block (0-191) */
+    /* IEC958 state */
+    UBYTE channel_status_l[24];
+    UBYTE channel_status_r[24];
+    ULONG frame_counter;
 };
 
 #endif /* AHI_Drivers_RPiHDMI_DriverData_h */

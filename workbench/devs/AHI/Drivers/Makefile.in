@@ -83,10 +83,14 @@ SUBDIRS		+= WASAPI
 endif
 
 #
-# Raspberry Pi audio drivers (ARM targets)
+# Raspberry Pi audio drivers (ARM/AArch64 targets)
 #
 ifeq ($(host_cpu),arm)
 SUBDIRS		+= RPiPWM
+SUBDIRS		+= RPiHDMI
+endif
+
+ifeq ($(host_cpu),aarch64)
 SUBDIRS		+= RPiHDMI
 endif
 

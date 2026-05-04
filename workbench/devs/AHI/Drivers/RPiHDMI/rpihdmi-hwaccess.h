@@ -7,23 +7,49 @@
 #include "DriverData.h"
 
 /*
- * GPU bus address for uncached DMA access.
- * On BCM2835/2836, ARM physical 0x00000000 maps to GPU bus 0xC0000000
- * (uncached alias).
+ * GPU bus address for DMA.
+ *
+ * BCM2835/2836/2837 (RPi 1/2/3):
+ *   ARM physical → GPU bus via uncached alias 0xC0000000.
+ *   peribase 0x20000000 or 0x3F000000.
+ *
+ * BCM2711 (RPi 4):
+ *   The "legacy" DMA controller (channels 0-6) uses a 32-bit address
+ *   space where ARM physical addresses in the low 1GB map directly
+ *   (the 0xC0000000 alias also works for addresses < 0x40000000).
+ *   Peripheral registers at bus 0x7E000000 map to ARM 0xFE000000.
+ *   For DMA to peripherals, use the bus address directly (0x7Exxxxxx).
+ *   For DMA from RAM, addresses < 0x40000000 use 0xC0000000 | addr.
  */
-#define GPU_BUS_ADDR(x) (0xC0000000 | (ULONG) (x))
+static inline ULONG gpu_bus_addr(IPTR arm_phys)
+{
+    return 0xC0000000 | (ULONG)(arm_phys & 0x3FFFFFFF);
+}
 
-/* Register access helpers (little-endian, with ARM memory barriers) */
+/* MAI DATA bus address (DMA destination) — same for both variants */
+#define HDMI_MAI_DATA_BUS_BCM2835 0x7E808020
+#define HDMI_MAI_DATA_BUS_BCM2711 0x7E80001C
+
+/* Register access helpers with memory barriers */
 static inline void __dsb(void)
 {
+#ifdef __aarch64__
+    asm volatile("dsb sy" ::: "memory");
+#else
     asm volatile("dsb" ::: "memory");
-}
-static inline void __dmb(void)
-{
-    asm volatile("dmb" ::: "memory");
+#endif
 }
 
-static inline ULONG rd32le(ULONG addr)
+static inline void __dmb(void)
+{
+#ifdef __aarch64__
+    asm volatile("dmb sy" ::: "memory");
+#else
+    asm volatile("dmb" ::: "memory");
+#endif
+}
+
+static inline ULONG rd32le(IPTR addr)
 {
     ULONG val;
     __dmb();
@@ -32,7 +58,7 @@ static inline ULONG rd32le(ULONG addr)
     return val;
 }
 
-static inline void wr32le(ULONG addr, ULONG val)
+static inline void wr32le(IPTR addr, ULONG val)
 {
     __dsb();
     *(volatile ULONG *) addr = AROS_LONG2LE(val);
@@ -40,31 +66,84 @@ static inline void wr32le(ULONG addr, ULONG val)
 }
 
 /*
- * HDMI HD register block (MAI control)
- * Bus address: 0x7E808000, ARM offset from peribase: 0x808000
+ * Register offsets for BCM2835 (VC4) — HD block at peribase + 0x808000
  */
-#define HD_OFFSET         0x808000
-#define HDMI_MAI_CTL(pb)  ((pb) + HD_OFFSET + 0x14)
-#define HDMI_MAI_THR(pb)  ((pb) + HD_OFFSET + 0x18)
-#define HDMI_MAI_FMT(pb)  ((pb) + HD_OFFSET + 0x1C)
-#define HDMI_MAI_DATA(pb) ((pb) + HD_OFFSET + 0x20)
-#define HDMI_MAI_SMP(pb)  ((pb) + HD_OFFSET + 0x2C)
+#define VC4_HD_OFFSET       0x808000
+#define VC4_HDMI_OFFSET     0x902000
+
+#define VC4_HD_MAI_CTL      0x0014
+#define VC4_HD_MAI_THR      0x0018
+#define VC4_HD_MAI_FMT      0x001C
+#define VC4_HD_MAI_DATA     0x0020
+#define VC4_HD_MAI_SMP      0x002C
+
+#define VC4_HDMI_MAI_CHANNEL_MAP   0x0090
+#define VC4_HDMI_MAI_CONFIG        0x0094
+#define VC4_HDMI_AUDIO_PKT_CFG     0x009C
+#define VC4_HDMI_RAM_PKT_CFG       0x00A0
+#define VC4_HDMI_RAM_PKT_STATUS    0x00A4
+#define VC4_HDMI_CRP_CFG           0x00A8
+#define VC4_HDMI_CTS_0             0x00AC
+#define VC4_HDMI_CTS_1             0x00B0
+#define VC4_HDMI_SCHEDULER_CONTROL 0x00C0
+#define VC4_HDMI_RAM_PKT_START     0x0400
 
 /*
- * HDMI register block — offsets from Linux vc4_hdmi_fields[] for BCM2835
- * Bus address: 0x7E902000, ARM offset from peribase: 0x902000
+ * Register offsets for BCM2711 (VC5) HDMI0 — HD block at peribase + 0x800000
+ * From Linux vc5_hdmi_hdmi0_fields[].
  */
-#define HDMI_OFFSET                0x902000
-#define HDMI_MAI_CHANNEL_MAP(pb)   ((pb) + HDMI_OFFSET + 0x090)
-#define HDMI_MAI_CONFIG(pb)        ((pb) + HDMI_OFFSET + 0x094)
-#define HDMI_AUDIO_PKT_CFG(pb)     ((pb) + HDMI_OFFSET + 0x09C)
-#define HDMI_RAM_PKT_CFG(pb)       ((pb) + HDMI_OFFSET + 0x0A0)
-#define HDMI_RAM_PKT_STATUS(pb)    ((pb) + HDMI_OFFSET + 0x0A4)
-#define HDMI_CRP_CFG(pb)           ((pb) + HDMI_OFFSET + 0x0A8)
-#define HDMI_CTS_0(pb)             ((pb) + HDMI_OFFSET + 0x0AC)
-#define HDMI_CTS_1(pb)             ((pb) + HDMI_OFFSET + 0x0B0)
-#define HDMI_SCHEDULER_CONTROL(pb) ((pb) + HDMI_OFFSET + 0x0C0)
-#define HDMI_RAM_PKT_START(pb)     ((pb) + HDMI_OFFSET + 0x400)
+#define VC5_HD_OFFSET       0x800000
+#define VC5_HDMI_OFFSET     0x802000
+#define VC5_RAM_OFFSET      0x802000  /* RAM packets in HDMI core block for VC5 */
+
+#define VC5_HD_MAI_CTL      0x0010
+#define VC5_HD_MAI_THR      0x0014
+#define VC5_HD_MAI_FMT      0x0018
+#define VC5_HD_MAI_DATA     0x001C
+#define VC5_HD_MAI_SMP      0x0020
+
+#define VC5_HDMI_MAI_CHANNEL_MAP   0x009C
+#define VC5_HDMI_MAI_CONFIG        0x00A0
+#define VC5_HDMI_AUDIO_PKT_CFG     0x00B8
+#define VC5_HDMI_RAM_PKT_CFG       0x00BC
+#define VC5_HDMI_RAM_PKT_STATUS    0x00C4
+#define VC5_HDMI_CRP_CFG           0x00C8
+#define VC5_HDMI_CTS_0             0x00CC
+#define VC5_HDMI_CTS_1             0x00D0
+#define VC5_HDMI_SCHEDULER_CONTROL 0x00E0
+#define VC5_HDMI_RAM_PKT_START     0x0400  /* Relative to RAM base */
+
+/*
+ * Accessor macros that select the correct offset based on variant.
+ * dd->hd_base, dd->hdmi_base, dd->ram_base are pre-computed.
+ */
+#define HD_REG(dd, vc4_off, vc5_off) \
+    ((dd)->hd_base + ((dd)->variant == VARIANT_BCM2711 ? (vc5_off) : (vc4_off)))
+
+#define HDMI_REG(dd, vc4_off, vc5_off) \
+    ((dd)->hdmi_base + ((dd)->variant == VARIANT_BCM2711 ? (vc5_off) : (vc4_off)))
+
+/* Convenience register accessors */
+#define REG_MAI_CTL(dd)          HD_REG(dd, VC4_HD_MAI_CTL, VC5_HD_MAI_CTL)
+#define REG_MAI_THR(dd)          HD_REG(dd, VC4_HD_MAI_THR, VC5_HD_MAI_THR)
+#define REG_MAI_FMT(dd)          HD_REG(dd, VC4_HD_MAI_FMT, VC5_HD_MAI_FMT)
+#define REG_MAI_DATA(dd)         HD_REG(dd, VC4_HD_MAI_DATA, VC5_HD_MAI_DATA)
+#define REG_MAI_SMP(dd)          HD_REG(dd, VC4_HD_MAI_SMP, VC5_HD_MAI_SMP)
+#define REG_MAI_CHANNEL_MAP(dd)  HDMI_REG(dd, VC4_HDMI_MAI_CHANNEL_MAP, VC5_HDMI_MAI_CHANNEL_MAP)
+#define REG_MAI_CONFIG(dd)       HDMI_REG(dd, VC4_HDMI_MAI_CONFIG, VC5_HDMI_MAI_CONFIG)
+#define REG_AUDIO_PKT_CFG(dd)    HDMI_REG(dd, VC4_HDMI_AUDIO_PKT_CFG, VC5_HDMI_AUDIO_PKT_CFG)
+#define REG_RAM_PKT_CFG(dd)      HDMI_REG(dd, VC4_HDMI_RAM_PKT_CFG, VC5_HDMI_RAM_PKT_CFG)
+#define REG_RAM_PKT_STATUS(dd)   HDMI_REG(dd, VC4_HDMI_RAM_PKT_STATUS, VC5_HDMI_RAM_PKT_STATUS)
+#define REG_CRP_CFG(dd)          HDMI_REG(dd, VC4_HDMI_CRP_CFG, VC5_HDMI_CRP_CFG)
+#define REG_CTS_0(dd)            HDMI_REG(dd, VC4_HDMI_CTS_0, VC5_HDMI_CTS_0)
+#define REG_CTS_1(dd)            HDMI_REG(dd, VC4_HDMI_CTS_1, VC5_HDMI_CTS_1)
+#define REG_SCHEDULER_CONTROL(dd) HDMI_REG(dd, VC4_HDMI_SCHEDULER_CONTROL, VC5_HDMI_SCHEDULER_CONTROL)
+
+/* RAM packet start — on BCM2711 this is at a fixed offset in the HDMI core block */
+#define REG_RAM_PKT_START(dd) \
+    ((dd)->variant == VARIANT_BCM2711 \
+        ? ((dd)->hdmi_base + VC5_HDMI_RAM_PKT_START) \
+        : ((dd)->hdmi_base + VC4_HDMI_RAM_PKT_START))
 
 /* MAI_CTL bits */
 #define MAI_CTL_RESET    (1 << 0)
@@ -94,7 +173,7 @@ static inline void wr32le(ULONG addr, ULONG val)
 #define MAI_CONFIG_FORMAT_REVERSE  (1 << 27)
 #define MAI_CONFIG_CHANNEL_MASK(x) ((x) & 0xFFFF)
 
-/* Audio packet config bits (HDMI block) */
+/* Audio packet config bits */
 #define AUDIO_PKT_CEA_MASK(x)           ((x) & 0xFF)
 #define AUDIO_PKT_B_FRAME_ID(x)         (((x) & 0xF) << 10)
 #define AUDIO_PKT_ZERO_DATA_ON_INACTIVE (1 << 24)
@@ -104,19 +183,13 @@ static inline void wr32le(ULONG addr, ULONG val)
 #define CRP_CFG_EXTERNAL_CTS_EN (1 << 24)
 #define CRP_CFG_N(x)            ((x) & 0xFFFFF)
 
-/* DMA channel to use for HDMI audio (channel 6, avoiding PWM on 5) */
+/* DMA channel for HDMI audio */
 #define HDMI_DMA_CHANNEL 6
 
 /* DMA DREQ peripheral map ID for HDMI audio */
 #define DMA_DREQ_HDMI 17
 
-/* Bus address of MAI DATA register (DMA destination) */
-#define HDMI_MAI_DATA_BUS 0x7E808020
-
-/*
- * BCM2835 DMA IRQ numbers.
- * DMA channel N uses GPU IRQ (16 + N).
- */
+/* BCM2835 DMA IRQ: channel N uses GPU IRQ (16 + N) */
 #define BCM_IRQ_DMA0 16
 
 /* DMA control block TI bits */
@@ -136,7 +209,7 @@ static inline void wr32le(ULONG addr, ULONG val)
 #define DMA_CS_PANIC_PRI(x)    (((x) & 0xF) << 20)
 #define DMA_CS_PRI(x)          (((x) & 0xF) << 16)
 #define DMA_CS_ABORT           (1 << 30)
-#define DMA_CS_RESET           (1 << 31)
+#define DMA_CS_RESET           (1U << 31)
 
 /* Sample rate enum values for MAI_FMT */
 #define SRATE_8000   1
@@ -153,19 +226,22 @@ static inline void wr32le(ULONG addr, ULONG val)
 #define SRATE_176400 14
 #define SRATE_192000 15
 
-/* Hardware setup/teardown functions */
+/* Hardware setup/teardown */
 void hdmi_mai_init(struct RPiHDMIData *dd);
 void hdmi_mai_stop(struct RPiHDMIData *dd);
 
-/* DMA functions */
-void dma_setup(ULONG peribase, ULONG channel, ULONG cb_bus_addr);
-void dma_stop(ULONG peribase, ULONG channel);
-void dma_build_control_blocks(struct RPiHDMIData *dd, ULONG peribase);
+/* Compute register base addresses from periiobase + variant */
+void hdmi_setup_bases(struct RPiHDMIData *dd);
 
-/* DMA interrupt handler (called from KrnAddIRQHandler) */
+/* DMA functions */
+void dma_setup(struct RPiHDMIData *dd, ULONG cb_bus_addr);
+void dma_stop(struct RPiHDMIData *dd);
+void dma_build_control_blocks(struct RPiHDMIData *dd);
+
+/* DMA interrupt handler */
 void dma_irq_handler(struct RPiHDMIData *data, void *data2);
 
-/* IEC958/SPDIF channel status setup (separate L/R per IEC 60958-3) */
+/* IEC958 channel status setup */
 void spdif_setup_channel_status(UBYTE *cs_left, UBYTE *cs_right, ULONG samplerate);
 
 /* IEC958 sample conversion */

@@ -355,6 +355,8 @@ AC_OUTPUT(Makefile
           Drivers/OSS/Makefile
           Drivers/PulseAudio/Makefile
           Drivers/WASAPI/Makefile
+          Drivers/RPiHDMI/Makefile
+          Drivers/RPiPWM/Makefile
           Examples/Makefile
           Examples/Device/PlayTest/Makefile
           Examples/Extras/CloneAudioModes/Makefile

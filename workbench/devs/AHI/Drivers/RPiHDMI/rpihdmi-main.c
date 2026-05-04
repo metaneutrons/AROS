@@ -67,7 +67,9 @@ _AHIsub_AllocAudio(struct TagItem *taglist, struct AHIAudioCtrlDrv *AudioCtrl, s
         dd->mastertask = (struct Process *) FindTask(NULL);
         dd->ahisubbase = RPiHDMIBase;
         dd->periiobase = RPiHDMIBase->periiobase;
+        dd->variant = RPiHDMIBase->variant;
         dd->dma_channel = HDMI_DMA_CHANNEL;
+        hdmi_setup_bases(dd);
     } else {
         return AHISF_ERROR;
     }
@@ -148,9 +150,9 @@ _AHIsub_Start(ULONG flags, struct AHIAudioCtrlDrv *AudioCtrl, struct DriverBase 
         if (dd->mixbuffer == NULL)
             return AHIE_NOMEM;
 
-        /* Allocate DMA buffers */
+        /* Allocate DMA buffers — must be in low memory for legacy DMA controller */
         for (i = 0; i < 2; i++) {
-            dd->dmabuf[i] = AllocVec(buf_bytes, MEMF_CLEAR | MEMF_PUBLIC);
+            dd->dmabuf[i] = AllocVec(buf_bytes, MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
             if (dd->dmabuf[i] == NULL)
                 return AHIE_NOMEM;
         }
@@ -158,21 +160,22 @@ _AHIsub_Start(ULONG flags, struct AHIAudioCtrlDrv *AudioCtrl, struct DriverBase 
         /*
          * Allocate DMA control blocks.
          * Each CB is 32 bytes and must be 32-byte aligned.
+         * Must be in low memory for legacy DMA controller.
          */
         cb_alloc_size = sizeof(struct DMAControlBlock) * 2 + 32;
-        cb_raw = AllocVec(cb_alloc_size, MEMF_CLEAR | MEMF_PUBLIC);
+        cb_raw = AllocVec(cb_alloc_size, MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
         if (cb_raw == NULL)
             return AHIE_NOMEM;
 
         dd->cb_base = (struct DMAControlBlock *) cb_raw;
 
         /* Align to 32 bytes */
-        cb_raw = (UBYTE *) (((ULONG) cb_raw + 31) & ~31);
+        cb_raw = (UBYTE *)(((IPTR)cb_raw + 31) & ~31);
         dd->cb[0] = (struct DMAControlBlock *) cb_raw;
         dd->cb[1] = (struct DMAControlBlock *) (cb_raw + sizeof(struct DMAControlBlock));
 
         /* Build the DMA control block chain */
-        dma_build_control_blocks(dd, dd->periiobase);
+        dma_build_control_blocks(dd);
 
         /* Flush DMA control blocks and buffers from ARM data cache */
         CacheClearE(dd->cb[0], sizeof(struct DMAControlBlock) * 2, CACRF_ClearD);
@@ -214,7 +217,7 @@ _AHIsub_Start(ULONG flags, struct AHIAudioCtrlDrv *AudioCtrl, struct DriverBase 
          */
         dd->irq_handle = KrnAddIRQHandler(BCM_IRQ_DMA0 + dd->dma_channel, dma_irq_handler, dd, SysBase);
 
-        dma_setup(dd->periiobase, dd->dma_channel, GPU_BUS_ADDR(dd->cb[0]));
+        dma_setup(dd, gpu_bus_addr((IPTR)dd->cb[0]));
     }
 
     if (flags & AHISF_RECORD) {
@@ -255,7 +258,7 @@ void _AHIsub_Stop(ULONG flags, struct AHIAudioCtrlDrv *AudioCtrl, struct DriverB
         }
 
         /* Stop hardware */
-        dma_stop(dd->periiobase, dd->dma_channel);
+        dma_stop(dd);
         hdmi_mai_stop(dd);
 
         dd->slavesignal = -1;
