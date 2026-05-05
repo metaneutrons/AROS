@@ -12,6 +12,8 @@
 #include <aros/macros.h>
 
 #include "genet.h"
+#include "delay.h"
+#define udelay udelay_calibrated
 
 /* Register access */
 static inline ULONG genet_rd(struct GENETUnit *unit, ULONG off)
@@ -34,10 +36,6 @@ static inline void genet_clr(struct GENETUnit *unit, ULONG off, ULONG bits)
     genet_wr(unit, off, genet_rd(unit, off) & ~bits);
 }
 
-static void udelay(ULONG us)
-{
-    /* Busy-wait using a simple loop; kernel timer not available at this level */
-    volatile ULONG i;
     for (i = 0; i < us * 10; i++)
         ;
 }

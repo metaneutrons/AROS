@@ -10,8 +10,12 @@
 #include <aros/macros.h>
 #include <aros/debug.h>
 #include <proto/exec.h>
+#include <devices/sana2.h>
+#include <string.h>
 
 #include "dwmac.h"
+#include "delay.h"
+#define udelay udelay_calibrated
 
 /* Register access */
 static inline ULONG dw_rd(struct DWMACUnit *u, ULONG off)
@@ -24,11 +28,6 @@ static inline void dw_wr(struct DWMACUnit *u, ULONG off, ULONG val)
     *(volatile ULONG *)(u->du_RegBase + off) = AROS_LONG2LE(val);
 }
 
-static void udelay(ULONG us)
-{
-    volatile ULONG i;
-    for (i = 0; i < us * 10; i++) ;
-}
 
 /* ============================================================
  * MDIO / PHY
@@ -224,14 +223,22 @@ void dwmac_hw_set_mac(struct DWMACUnit *unit, UBYTE *addr)
  * TX / RX
  * ============================================================ */
 
+static void dwmac_dma_reset(struct DWMACUnit *unit);
 int dwmac_hw_send(struct DWMACUnit *unit, UBYTE *data, ULONG length)
 {
     ULONG idx = unit->du_TxCur;
     struct DWMACDesc *desc = &unit->du_TxDesc[idx];
+    int tries = 10000;
 
-    /* Wait for descriptor to be free */
-    if (AROS_LE2LONG(desc->status) & DESC_OWN)
+    /* Wait for descriptor to be free (with timeout) */
+    while ((AROS_LE2LONG(desc->status) & DESC_OWN) && --tries)
+        udelay_calibrated(10);
+
+    if (!tries) {
+        D(bug("[dwmac] TX timeout — DMA reset\n"));
+        dwmac_dma_reset(unit);
         return -1;
+    }
 
     /* Copy data to TX buffer */
     CopyMem(data, unit->du_TxBuf + idx * ETH_BUF_SIZE, length);
@@ -313,4 +320,86 @@ void dwmac_irq_handler(struct DWMACUnit *unit, void *data2)
 
     if (unit->du_Task && unit->du_IntSig != (ULONG)-1)
         Signal(unit->du_Task, 1 << unit->du_IntSig);
+}
+
+/* ============================================================
+ * Error Recovery
+ * ============================================================ */
+
+/*
+ * Reset the DMA engine after a timeout or error.
+ * Preserves MAC configuration but reinitializes DMA rings.
+ */
+static void dwmac_dma_reset(struct DWMACUnit *unit)
+{
+    ULONG i;
+
+    D(bug("[dwmac] DMA reset\n"));
+
+    /* Stop DMA */
+    dw_wr(unit, DMA_OP_MODE, 0);
+    udelay_calibrated(100);
+
+    /* Soft reset DMA */
+    dw_wr(unit, DMA_BUS_MODE, DMA_BUS_MODE_SWR);
+    {
+        int tries = 100;
+        while ((dw_rd(unit, DMA_BUS_MODE) & DMA_BUS_MODE_SWR) && --tries)
+            udelay_calibrated(100);
+        if (!tries)
+            D(bug("[dwmac] DMA reset timeout!\n"));
+    }
+
+    /* Reinitialize DMA */
+    dw_wr(unit, DMA_BUS_MODE, DMA_BUS_MODE_FB | DMA_BUS_MODE_PBL(8));
+
+    /* Reset descriptor rings */
+    for (i = 0; i < TX_RING_SIZE; i++) {
+        unit->du_TxDesc[i].status = 0;
+        unit->du_TxDesc[i].ctrl = AROS_LONG2LE(DESC_TX_CHAIN);
+    }
+    for (i = 0; i < RX_RING_SIZE; i++) {
+        unit->du_RxDesc[i].status = AROS_LONG2LE(DESC_OWN);
+        unit->du_RxDesc[i].ctrl = AROS_LONG2LE(DESC_RX_CHAIN | (ETH_BUF_SIZE << DESC_CTRL_SIZE1_SHIFT));
+    }
+
+    dw_wr(unit, DMA_TX_DESC_LIST, (ULONG)(IPTR)unit->du_TxDesc);
+    dw_wr(unit, DMA_RX_DESC_LIST, (ULONG)(IPTR)unit->du_RxDesc);
+
+    unit->du_TxCur = 0;
+    unit->du_RxCur = 0;
+
+    /* Re-enable DMA */
+    dw_wr(unit, DMA_INT_ENABLE, DMA_INT_EN_NIE | DMA_INT_EN_RIE | DMA_INT_EN_TIE);
+    dw_wr(unit, DMA_OP_MODE, DMA_OP_MODE_SF | DMA_OP_MODE_ST | DMA_OP_MODE_SR);
+    dw_wr(unit, DMA_RX_POLL, 1);
+
+    unit->du_Stats.Overruns++;
+}
+
+/*
+ * Check for PHY link-down and attempt recovery.
+ * Called periodically from the unit task.
+ */
+void dwmac_check_link(struct DWMACUnit *unit)
+{
+    UWORD bmsr = dwmac_mdio_read(unit, unit->du_PhyAddr, 0x01); /* BMSR */
+    BOOL link_now = (bmsr & 0x0004) ? TRUE : FALSE;
+
+    if (unit->du_LinkUp && !link_now) {
+        D(bug("[dwmac] Link DOWN\n"));
+        unit->du_LinkUp = FALSE;
+        /* Disable TX/RX until link returns */
+        dw_wr(unit, MAC_CONF, dw_rd(unit, MAC_CONF) & ~(MAC_CONF_TE | MAC_CONF_RE));
+    } else if (!unit->du_LinkUp && link_now) {
+        D(bug("[dwmac] Link UP — renegotiating\n"));
+        dwmac_phy_init(unit);
+        /* Re-enable TX/RX with new speed */
+        ULONG mac_conf = MAC_CONF_DM | MAC_CONF_ACS | MAC_CONF_TE | MAC_CONF_RE;
+        if (unit->du_LinkSpeed == 100)
+            mac_conf |= MAC_CONF_FES | MAC_CONF_PS;
+        else if (unit->du_LinkSpeed == 10)
+            mac_conf |= MAC_CONF_PS;
+        dw_wr(unit, MAC_CONF, mac_conf);
+    }
 }

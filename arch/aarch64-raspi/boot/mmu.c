@@ -65,12 +65,14 @@ extern void *malloc(size_t size);
  * TCR_EL1 fields — ARM ARM D13.2.120
  */
 #define TCR_T0SZ_36BIT      28          /* 64 - 36 = 28 → 64GB VA space */
+#define TCR_T0SZ_40BIT      24          /* 64 - 40 = 24 → 1TB VA space */
 #define TCR_TG0_4KB         (0UL << 14)
 #define TCR_SH0_INNER       (3UL << 12)
 #define TCR_ORGN0_WB_ALLOC  (1UL << 10)
 #define TCR_IRGN0_WB_ALLOC  (1UL << 8)
 #define TCR_EPD1            (1UL << 23) /* Disable TTBR1 walks */
 #define TCR_IPS_64GB        (1UL << 32) /* 36-bit PA = 64GB */
+#define TCR_IPS_1TB         (2UL << 32) /* 40-bit PA = 1TB */
 
 /* SCTLR_EL1 bits — ARM ARM D13.2.113 */
 #define SCTLR_M             (1UL << 0)  /* MMU enable */
@@ -163,15 +165,35 @@ void mmu_load(void)
 
     __asm__ volatile("dsb sy" ::: "memory");
 
+    /*
+     * BCM2712 (RPi5) peripherals at 0x107C000000 (GB index 4).
+     * Map as 1GB device block if not already covered.
+     * With 40-bit VA (T0SZ=24), L1 can have up to 512 entries.
+     */
+    {
+        unsigned int bcm2712_gb = 4; /* 0x100000000 .. 0x13FFFFFFF */
+        uint64_t *l2 = alloc_page_table();
+        if (l2) {
+            memset(l2, 0, PAGE_SIZE);
+            for (mb = 0; mb < ENTRIES_PER_TABLE; mb++) {
+                uint64_t addr = (uint64_t)bcm2712_gb * L1_BLOCK_SIZE +
+                                (uint64_t)mb * L2_BLOCK_SIZE;
+                l2[mb] = block_desc(addr, ATTR_DEVICE, DESC_SH_OUTER);
+            }
+            l1_table[bcm2712_gb] = DESC_VALID | DESC_TABLE |
+                                    ((uint64_t)l2 & 0x0000FFFFFFFFF000UL);
+        }
+    }
+
     kprintf("[BOOT] MMU: L1 at %p, mem=%luMB, 4KB granule\n",
             l1_table, (unsigned long)(mem_top >> 20));
 
     /* Program system registers — ARM ARM D13.2 */
     __asm__ volatile("msr mair_el1, %0" : : "r"(MAIR_VALUE));
 
-    uint64_t tcr = TCR_T0SZ_36BIT | TCR_TG0_4KB | TCR_SH0_INNER |
+    uint64_t tcr = TCR_T0SZ_40BIT | TCR_TG0_4KB | TCR_SH0_INNER |
                    TCR_ORGN0_WB_ALLOC | TCR_IRGN0_WB_ALLOC |
-                   TCR_EPD1 | TCR_IPS_64GB;
+                   TCR_EPD1 | TCR_IPS_1TB;
     __asm__ volatile("msr tcr_el1, %0" : : "r"(tcr));
     __asm__ volatile("msr ttbr0_el1, %0" : : "r"((uint64_t)l1_table));
     __asm__ volatile("tlbi vmalle1; dsb sy; isb" ::: "memory");

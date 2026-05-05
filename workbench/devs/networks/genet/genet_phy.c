@@ -8,6 +8,7 @@
 #include <aros/macros.h>
 
 #include "genet.h"
+#include "delay.h"
 
 static inline ULONG genet_rd(struct GENETUnit *unit, ULONG off)
 {
@@ -119,7 +120,7 @@ BOOL genet_PHY_Init(struct GENETUnit *unit)
         if (bmsr & BMSR_LSTATUS)
             break;
         /* ~1ms delay */
-        volatile int d; for (d = 0; d < 10000; d++) ;
+        udelay_calibrated(1000);
     } while (--tries);
 
     if (!(bmsr & BMSR_LSTATUS)) {

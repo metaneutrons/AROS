@@ -1,112 +1,87 @@
 /*
  * RP1 Southbridge driver for Raspberry Pi 5
  *
- * The RP1 is a PCIe-attached I/O controller that provides:
- * - 2× USB 3.0 (xHCI)
- * - Gigabit Ethernet (GENET-like)
- * - GPIO, I2C, SPI, UART
- *
- * It appears as a PCIe device (vendor 0x1de4, device 0x0001).
- * BAR1 contains all peripheral registers as MMIO offsets.
- *
- * This resource discovers the RP1 via PCI enumeration and exports
- * the BAR1 base address for other drivers to use.
+ * Discovers RP1 via direct PCIe ECAM config space read (bus 1, dev 0).
+ * The PCIe RC must be initialized before this resource loads (pri 87 > 80).
  */
 
 #include <exec/types.h>
 #include <exec/memory.h>
-#include <exec/resident.h>
 #include <aros/debug.h>
 #include <aros/symbolsets.h>
 #include <aros/macros.h>
 #include <proto/exec.h>
-#include <proto/oop.h>
-#include <hidd/pci.h>
+#include <proto/kernel.h>
 
 #include "rp1.h"
 
 #include LC_LIBDEFS_FILE
 
-/* Global RP1 state — accessible by other drivers */
-struct RP1Base *RP1;
+/* PCIe ECAM access for BCM2711/2712 */
+#define PCIE_RC_BASE        0xFD500000
+#define PCIE_EXT_CFG_INDEX  0x9000
+#define PCIE_EXT_CFG_DATA   0x8000
+#define PCIE_ECAM_OFFSET(bus, dev, func) \
+    (((bus) << 20) | ((dev) << 15) | ((func) << 12))
+
+struct RP1Base *RP1 = NULL;
+
+static ULONG pcie_cfg_read(ULONG bus, ULONG dev, ULONG func, ULONG reg)
+{
+    volatile ULONG *rc = (volatile ULONG *)PCIE_RC_BASE;
+
+    /* Write ECAM index */
+    rc[PCIE_EXT_CFG_INDEX / 4] = AROS_LONG2LE(PCIE_ECAM_OFFSET(bus, dev, func));
+
+    /* Read from data window */
+    return AROS_LE2LONG(*(volatile ULONG *)(PCIE_RC_BASE + PCIE_EXT_CFG_DATA + reg));
+}
 
 static int RP1_Init(LIBBASETYPEPTR LIBBASE)
 {
-    struct Library *OOPBase;
-    OOP_Object *pci;
-    OOP_Object *dev = NULL;
-    IPTR vendor, device, bar1_addr, bar1_size;
+    ULONG id, bar1;
+    UWORD vendor, device;
 
-    D(bug("[RP1] Init — scanning PCIe for RP1 southbridge\n"));
+    D(bug("[RP1] Init — probing PCIe bus 1 for RP1\n"));
 
-    OOPBase = OpenLibrary("oop.library", 0);
-    if (!OOPBase)
-        return TRUE; /* Not fatal — RPi4 doesn't have RP1 */
+    /* Read vendor/device ID from bus 1, dev 0, func 0 */
+    id = pcie_cfg_read(1, 0, 0, 0x00);
+    vendor = id & 0xFFFF;
+    device = (id >> 16) & 0xFFFF;
 
-    /* Find PCI subsystem */
-    pci = OOP_NewObject(NULL, CLID_Hidd_PCI, NULL);
-    if (!pci) {
-        CloseLibrary(OOPBase);
+    if (vendor != RP1_PCIE_VENDOR_ID || device != RP1_PCIE_DEVICE_ID) {
+        D(bug("[RP1] No RP1 found (id=0x%08lx) — not RPi5\n", id));
+        return TRUE; /* Not fatal */
+    }
+
+    /* Read BAR1 (memory-mapped, 64-bit capable) */
+    bar1 = pcie_cfg_read(1, 0, 0, 0x14) & ~0xF;
+
+    if (bar1 == 0 || bar1 == 0xFFFFFFFF) {
+        D(bug("[RP1] BAR1 not assigned (0x%08lx) — PCIe RC not initialized?\n", bar1));
         return TRUE;
     }
 
-    /*
-     * Scan for RP1: Vendor 0x1de4, Device 0x0001.
-     * On RPi5, this is the only device on the internal PCIe bus.
-     *
-     * TODO: Use proper PCI enumeration hook. For now, directly
-     * read config space for bus 1, dev 0, func 0.
-     */
-    {
-        struct pHidd_PCIDriver_ReadConfigLong rcl;
-        OOP_AttrBase HiddPCIDriverAttrBase = OOP_ObtainAttrBase(IID_Hidd_PCIDriver);
+    D(bug("[RP1] Found RP1: vendor=0x%04x device=0x%04x BAR1=0x%08lx\n",
+          vendor, device, bar1));
 
-        /* Read vendor/device from bus 1, dev 0 */
-        rcl.mID = OOP_GetMethodID(IID_Hidd_PCIDriver, moHidd_PCIDriver_ReadConfigLong);
-        rcl.bus = 1;
-        rcl.dev = 0;
-        rcl.sub = 0;
-        rcl.reg = 0x00; /* Vendor + Device ID */
+    LIBBASE->rp1_BAR1 = (IPTR)bar1;
+    LIBBASE->rp1_Present = TRUE;
 
-        ULONG id = OOP_DoMethod(pci, (OOP_Msg)&rcl);
-        vendor = id & 0xFFFF;
-        device = (id >> 16) & 0xFFFF;
+    /* Export peripheral addresses */
+    LIBBASE->rp1_USB0  = LIBBASE->rp1_BAR1 + RP1_USB0_OFFSET;
+    LIBBASE->rp1_USB1  = LIBBASE->rp1_BAR1 + RP1_USB1_OFFSET;
+    LIBBASE->rp1_ETH   = LIBBASE->rp1_BAR1 + RP1_ETH_OFFSET;
+    LIBBASE->rp1_GPIO  = LIBBASE->rp1_BAR1 + RP1_GPIO_OFFSET;
+    LIBBASE->rp1_I2C0  = LIBBASE->rp1_BAR1 + RP1_I2C0_OFFSET;
+    LIBBASE->rp1_I2C1  = LIBBASE->rp1_BAR1 + RP1_I2C1_OFFSET;
+    LIBBASE->rp1_UART0 = LIBBASE->rp1_BAR1 + RP1_UART0_OFFSET;
 
-        if (vendor == RP1_PCIE_VENDOR_ID && device == RP1_PCIE_DEVICE_ID) {
-            /* Read BAR1 */
-            rcl.reg = 0x14; /* BAR1 */
-            bar1_addr = OOP_DoMethod(pci, (OOP_Msg)&rcl) & ~0xF;
-
-            D(bug("[RP1] Found RP1 at PCIe bus 1 dev 0, BAR1=0x%p\n", bar1_addr));
-
-            LIBBASE->rp1_BAR1 = bar1_addr;
-            LIBBASE->rp1_Present = TRUE;
-
-            /* Export peripheral addresses */
-            LIBBASE->rp1_USB0 = bar1_addr + RP1_USB0_OFFSET;
-            LIBBASE->rp1_USB1 = bar1_addr + RP1_USB1_OFFSET;
-            LIBBASE->rp1_ETH  = bar1_addr + RP1_ETH_OFFSET;
-            LIBBASE->rp1_GPIO = bar1_addr + RP1_GPIO_OFFSET;
-            LIBBASE->rp1_I2C0 = bar1_addr + RP1_I2C0_OFFSET;
-            LIBBASE->rp1_I2C1 = bar1_addr + RP1_I2C1_OFFSET;
-            LIBBASE->rp1_UART0 = bar1_addr + RP1_UART0_OFFSET;
-
-            D(bug("[RP1] USB0=0x%p ETH=0x%p GPIO=0x%p\n",
-                  LIBBASE->rp1_USB0, LIBBASE->rp1_ETH, LIBBASE->rp1_GPIO));
-        } else {
-            D(bug("[RP1] No RP1 found (vendor=0x%04x device=0x%04x) — RPi4?\n",
-                  vendor, device));
-        }
-
-        if (HiddPCIDriverAttrBase)
-            OOP_ReleaseAttrBase(IID_Hidd_PCIDriver);
-    }
-
-    OOP_DisposeObject(pci);
-    CloseLibrary(OOPBase);
+    D(bug("[RP1] USB0=0x%p ETH=0x%p GPIO=0x%p I2C0=0x%p\n",
+          LIBBASE->rp1_USB0, LIBBASE->rp1_ETH,
+          LIBBASE->rp1_GPIO, LIBBASE->rp1_I2C0));
 
     RP1 = LIBBASE;
-
     return TRUE;
 }
 

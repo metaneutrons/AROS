@@ -188,6 +188,7 @@ void dwmac_hw_stop(struct DWMACUnit *unit);
 int  dwmac_hw_send(struct DWMACUnit *unit, UBYTE *data, ULONG length);
 void dwmac_hw_set_mac(struct DWMACUnit *unit, UBYTE *addr);
 void dwmac_rx_poll(struct DWMACUnit *unit);
+void dwmac_tx_process(struct DWMACUnit *unit);
 
 /* MDIO/PHY */
 UWORD dwmac_mdio_read(struct DWMACUnit *unit, ULONG phy, ULONG reg);

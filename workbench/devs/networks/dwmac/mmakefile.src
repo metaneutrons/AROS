@@ -5,6 +5,7 @@ include $(SRCDIR)/config/aros.cfg
 
 FILES := handler dwmac_hw
 
+USER_INCLUDES := -I$(SRCDIR)/arch/aarch64-native/kernel
 USER_LDFLAGS := -static
 
 %build_module mmake=workbench-devs-networks-dwmac \

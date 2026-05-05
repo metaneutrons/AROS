@@ -60,7 +60,23 @@ static int dwmac_Init(LIBBASETYPEPTR LIBBASE)
      * For now, use a placeholder that will be filled by RP1 init.
      * The RP1 resource sets up the BAR1 mapping and exports it.
      */
-    unit->du_RegBase = 0; /* Will be set when RP1 is available */
+    /* Get RP1 BAR1 from rp1.resource (initialized at pri 80, before us at -60) */
+    {
+        struct Library *rp1base = OpenResource("rp1.resource");
+        if (rp1base) {
+            /* RP1Base struct starts with Library, then BOOL + IPTR BAR1 */
+            IPTR *fields = (IPTR *)((UBYTE *)rp1base + sizeof(struct Library));
+            if (fields[0]) { /* rp1_Present */
+                unit->du_RegBase = fields[1] + 0x180000; /* BAR1 + ETH offset */
+                D(bug("[dwmac] Got RP1 ETH base: 0x%p\n", unit->du_RegBase));
+            }
+        }
+        if (!unit->du_RegBase) {
+            D(bug("[dwmac] RP1 not available\n"));
+            FreeVec(unit);
+            return TRUE;
+        }
+    }
 
     InitSemaphore(&unit->du_Lock);
     NEWLIST(&unit->du_ReadList);

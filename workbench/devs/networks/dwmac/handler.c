@@ -87,26 +87,15 @@ AROS_LH1(void, BeginIO,
     case CMD_WRITE:
     case S2_BROADCAST:
         if (unit->du_Flags & DUF_ONLINE) {
-            UBYTE frame[ETH_MAXPACKETSIZE];
-            ULONG framelen = ETH_HEADERSIZE + req->ios2_DataLength;
-
-            if (req->ios2_Req.io_Command == S2_BROADCAST)
-                memset(frame, 0xFF, ETH_ADDRSIZE);
-            else
-                CopyMem(req->ios2_DstAddr, frame, ETH_ADDRSIZE);
-            CopyMem(unit->du_DevAddr, frame + ETH_ADDRSIZE, ETH_ADDRSIZE);
-            frame[12] = (req->ios2_PacketType >> 8) & 0xFF;
-            frame[13] = req->ios2_PacketType & 0xFF;
-            CopyMem(req->ios2_Data, frame + ETH_HEADERSIZE, req->ios2_DataLength);
-
-            if (dwmac_hw_send(unit, frame, framelen) == 0) {
-                unit->du_Stats.PacketsSent++;
-            } else {
-                req->ios2_Req.io_Error = S2ERR_TX_FAILURE;
-            }
-        } else {
-            req->ios2_Req.io_Error = S2ERR_OUTOFSERVICE;
+            req->ios2_Req.io_Flags &= ~IOF_QUICK;
+            ObtainSemaphore(&unit->du_Lock);
+            AddTail((struct List *)&unit->du_WriteList, (struct Node *)req);
+            ReleaseSemaphore(&unit->du_Lock);
+            if (unit->du_Task)
+                Signal(unit->du_Task, 1 << unit->du_IntSig);
+            return;
         }
+        req->ios2_Req.io_Error = S2ERR_OUTOFSERVICE;
         break;
     case CMD_FLUSH:
         ObtainSemaphore(&unit->du_Lock);

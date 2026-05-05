@@ -7,6 +7,7 @@ FILES := handler unit genet_hw genet_phy
 
 CFLAGSNORMAL = $(CFLAGS) -DDEBUG=0
 CFLAGSDEBUG = $(CFLAGS) -DDEBUG=1
+USER_INCLUDES := -I$(SRCDIR)/arch/aarch64-native/kernel
 USER_LDFLAGS := -static
 
 #MM- workbench-devs-networks-genet : workbench-devs-networks-genet-normal
