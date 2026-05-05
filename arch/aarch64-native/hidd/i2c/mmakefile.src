@@ -1,0 +1,10 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+USER_LDFLAGS := -static
+
+%build_module mmake=hidd-i2c-bcm2711 \
+  modname=i2c-bcm2711 modtype=hidd \
+  files="i2c_bcm2711"
+
+%common

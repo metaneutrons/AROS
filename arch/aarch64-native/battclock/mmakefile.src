@@ -1,0 +1,8 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+USER_LDFLAGS := -static
+
+%build_module mmake=kernel-battclock-raspi-aarch64 \
+  modname=battclock modtype=resource \
+  files="battclock_init"
