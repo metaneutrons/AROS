@@ -1,0 +1,9 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+USER_INCLUDES := -I$(SRCDIR)/arch/aarch64-native/kernel
+USER_LDFLAGS := -static
+
+%build_module mmake=kernel-rp1 \
+  modname=rp1 modtype=resource \
+  files="rp1_init"

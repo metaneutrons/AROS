@@ -24,6 +24,7 @@ CFILES := \
     kernel_startup \
     platform_init \
     platform_bcm2711 \
+    platform_bcm2712 \
     gic400 \
     timer \
     vc_fb \
