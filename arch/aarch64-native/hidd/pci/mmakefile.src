@@ -1,0 +1,8 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+USER_LDFLAGS := -static
+
+%build_module mmake=kernel-hidd-pci-bcm2711 \
+  modname=pci-bcm2711 modtype=hidd \
+  files="pci_bcm2711_init driverclass"
