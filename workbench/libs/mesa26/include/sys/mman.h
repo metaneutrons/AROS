@@ -9,6 +9,7 @@
 #define MAP_ANON MAP_ANONYMOUS
 #define MAP_FAILED ((void *)-1)
 #define MAP_SHARED 1
+#define MAP_FIXED 0x10
 void *mmap(void *a, size_t l, int p, int f, int fd, long o);
 int munmap(void *a, size_t l);
 int mprotect(void *a, size_t l, int p);

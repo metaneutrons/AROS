@@ -123,3 +123,26 @@ int clock_nanosleep(int c, int f, const void *r, void *rm) { (void)c; (void)f; (
 int nanosleep(const void *r, void *rm) { (void)r; (void)rm; return 0; }
 void *localtime_r(const void *t, void *r) { (void)t; return r; }
 long syscall(long n, ...) { (void)n; return -1; }
+int inotify_init1(int f) { (void)f; return -1; }
+int inotify_add_watch(int fd, const char *p, unsigned int m) { (void)fd; (void)p; (void)m; return -1; }
+int inotify_rm_watch(int fd, int wd) { (void)fd; (void)wd; return -1; }
+int eventfd(unsigned int v, int f) { (void)v; (void)f; return -1; }
+int eventfd_write(int fd, unsigned long long v) { (void)fd; (void)v; return -1; }
+int eventfd_read(int fd, unsigned long long *v) { (void)fd; (void)v; return -1; }
+int socket(int d, int t, int p) { (void)d; (void)t; (void)p; return -1; }
+int bind(int fd, const void *a, unsigned int l) { (void)fd; (void)a; (void)l; return -1; }
+int listen(int fd, int b) { (void)fd; (void)b; return -1; }
+int accept(int fd, void *a, unsigned int *l) { (void)fd; (void)a; (void)l; return -1; }
+int connect(int fd, const void *a, unsigned int l) { (void)fd; (void)a; (void)l; return -1; }
+long recv(int fd, void *b, unsigned long l, int f) { (void)fd; (void)b; (void)l; (void)f; return -1; }
+long send(int fd, const void *b, unsigned long l, int f) { (void)fd; (void)b; (void)l; (void)f; return -1; }
+int sched_yield(void) { return 0; }
+long clock(void) { return 0; }
+double difftime(long t1, long t0) { return (double)(t1 - t0); }
+long mktime(void *tm) { (void)tm; return 0; }
+char *asctime(const void *tm) { (void)tm; return ""; }
+char *ctime(const long *t) { (void)t; return ""; }
+char *strftime_stub(char *s, unsigned long m, const char *f, const void *t) { (void)s; (void)m; (void)f; (void)t; if(s && m) s[0]=0; return s; }
+void *gmtime(const long *t) { (void)t; return NULL; }
+void *localtime_simple(const long *t) { (void)t; return NULL; }
+unsigned long strftime(char *s, unsigned long m, const char *f, const void *t) { (void)f; (void)t; if(s && m) s[0]=0; return 0; }

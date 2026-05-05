@@ -75,4 +75,7 @@ int pthread_barrier_wait(pthread_barrier_t *b);
 
 int pthread_setaffinity_np(pthread_t t, size_t s, const void *c);
 
-#endif
+#define _POSIX_THREADS 200112L
+#define PTHREAD_COND_INITIALIZER 0
+#define PTHREAD_MUTEX_INITIALIZER 0
+#endif /* PTHREAD_H_MESA_STUB */
