@@ -10,6 +10,7 @@ USER_LDFLAGS := -static $(MESA26_LIBS)
 
 %build_module mmake=hidd-v3d \
   modname=v3d modtype=hidd \
-  files="v3d_init v3d_hw v3d_galliumclass v3d_drm_shim"
+  files="v3d_init v3d_hw v3d_galliumclass v3d_drm_shim" \
+  uselibs="posixc_rel stdc_rel"
 
 %common

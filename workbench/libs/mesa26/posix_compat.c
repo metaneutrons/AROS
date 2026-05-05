@@ -1,3 +1,4 @@
+#include <sys/time.h>
 /*
  * POSIX compatibility for Mesa 26 on AROS — all implementations
  */
@@ -66,26 +67,6 @@ int munmap(void *a, size_t l) { (void)l; free(a); return 0; }
 int mprotect(void *a, size_t l, int p) { (void)a; (void)l; (void)p; return 0; }
 
 /* clock */
-int clock_gettime(int clk, void *ts) {
-    long *t = (long *)ts;
-    (void)clk;
-#ifdef __aarch64__
-    uint64_t cnt, freq;
-    __asm__ volatile("mrs %0, cntpct_el0" : "=r"(cnt));
-    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(freq));
-    t[0] = cnt / freq;
-    t[1] = ((cnt % freq) * 1000000000ULL) / freq;
-#elif defined(__x86_64__) || defined(__i386__)
-    /* x86: use rdtsc (approximate, ~3GHz assumed) */
-    uint64_t tsc;
-    __asm__ volatile("rdtsc" : "=A"(tsc));
-    t[0] = tsc / 3000000000ULL;
-    t[1] = ((tsc % 3000000000ULL) * 1000000000ULL) / 3000000000ULL;
-#else
-    t[0] = 0; t[1] = 0;
-#endif
-    return 0;
-}
 
 /* dl */
 void *dlopen(const char *f, int fl) { (void)f; (void)fl; return NULL; }
@@ -120,19 +101,14 @@ int dup(int fd) { (void)fd; return -1; }
 int mkstemps(char *t, int s) { (void)t; (void)s; return -1; }
 int fchmod(int fd, unsigned int m) { (void)fd; (void)m; return 0; }
 int symlink(const char *t, const char *l) { (void)t; (void)l; return -1; }
-int readlink(const char *p, char *b, size_t s) { (void)p; (void)b; (void)s; return -1; }
 int getpwuid_r(unsigned int uid, void *pwd, char *buf, size_t len, void **res) {
     (void)uid; (void)pwd; (void)buf; (void)len; *res = NULL; return -1;
 }
 
 #include <stdio.h>
 FILE *fdopen(int fd, const char *mode) { (void)fd; (void)mode; return NULL; }
-const char *util_get_process_name(void) { return "AROS"; }
 FILE *open_memstream(char **p, size_t *s) { (void)p; (void)s; return NULL; }
 int clock_nanosleep(int c, int f, const void *r, void *rm) { (void)c; (void)f; (void)r; (void)rm; return 0; }
-int nanosleep(const void *r, void *rm) { (void)r; (void)rm; return 0; }
-void *localtime_r(const void *t, void *r) { (void)t; return r; }
-long syscall(long n, ...) { (void)n; return -1; }
 int inotify_init1(int f) { (void)f; return -1; }
 int inotify_add_watch(int fd, const char *p, unsigned int m) { (void)fd; (void)p; (void)m; return -1; }
 int inotify_rm_watch(int fd, int wd) { (void)fd; (void)wd; return -1; }
@@ -147,15 +123,7 @@ int connect(int fd, const void *a, unsigned int l) { (void)fd; (void)a; (void)l;
 long recv(int fd, void *b, unsigned long l, int f) { (void)fd; (void)b; (void)l; (void)f; return -1; }
 long send(int fd, const void *b, unsigned long l, int f) { (void)fd; (void)b; (void)l; (void)f; return -1; }
 int sched_yield(void) { return 0; }
-long clock(void) { return 0; }
-double difftime(long t1, long t0) { return (double)(t1 - t0); }
-long mktime(void *tm) { (void)tm; return 0; }
-char *asctime(const void *tm) { (void)tm; return ""; }
-char *ctime(const long *t) { (void)t; return ""; }
 char *strftime_stub(char *s, unsigned long m, const char *f, const void *t) { (void)s; (void)m; (void)f; (void)t; if(s && m) s[0]=0; return s; }
-void *gmtime(const long *t) { (void)t; return NULL; }
-void *localtime_simple(const long *t) { (void)t; return NULL; }
-unsigned long strftime(char *s, unsigned long m, const char *f, const void *t) { (void)f; (void)t; if(s && m) s[0]=0; return 0; }
 int setpriority(int w, int who, int p) { (void)w; (void)who; (void)p; return 0; }
 int gettimeofday(struct timeval *tv, void *tz) { (void)tz; if(tv){tv->tv_sec=0;tv->tv_usec=0;} return 0; }
 int pthread_getcpuclockid(unsigned long t, int *c) { (void)t; *c = 1; return 0; }
@@ -163,3 +131,4 @@ int sched_getcpu(void) { return 0; }
 int pthread_sigmask(int h, const void *s, void *o) { (void)h; (void)s; (void)o; return 0; }
 int pthread_setname_np(unsigned long t, const char *n) { (void)t; (void)n; return 0; }
 int flock(int fd, int op) { (void)fd; (void)op; return 0; }
+/* C stdlib wrappers - needed for static linking */
