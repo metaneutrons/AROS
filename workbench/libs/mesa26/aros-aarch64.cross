@@ -1,0 +1,39 @@
+# Meson cross-file for building Mesa 26 targeting AROS AArch64
+#
+# Usage:
+#   meson setup builddir ../external/mesa \
+#     --cross-file ../workbench/libs/mesa26/aros-aarch64.cross \
+#     -Dprefix=/tmp/mesa26-aros \
+#     -Dgallium-drivers=v3d,softpipe \
+#     -Dvulkan-drivers= \
+#     -Dplatforms= \
+#     -Dglx=disabled \
+#     -Degl=disabled \
+#     -Dllvm=disabled \
+#     -Dshared-glapi=disabled \
+#     -Dbuildtype=release
+
+[binaries]
+c = 'aarch64-aros-gcc'
+cpp = 'aarch64-aros-g++'
+ar = 'aarch64-aros-ar'
+strip = 'aarch64-aros-strip'
+pkgconfig = 'false'
+
+[built-in options]
+c_args = ['-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM']
+cpp_args = ['-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM']
+c_link_args = ['-static', '-L@SRCDIR@/workbench/libs/mesa26', '-laros_mesa_compat']
+cpp_link_args = ['-static', '-L@SRCDIR@/workbench/libs/mesa26', '-laros_mesa_compat']
+
+[host_machine]
+system = 'aros'
+cpu_family = 'aarch64'
+cpu = 'cortex-a72'
+endian = 'little'
+
+[properties]
+sys_root = ''
+needs_exe_wrapper = true
+has_function_printf = true
+has_function_htons = true
