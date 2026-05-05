@@ -1,146 +1,122 @@
 /*
- * POSIX/Linux compatibility stubs for Mesa 26 on AROS
- *
- * Mesa expects various POSIX functions that don't exist on AROS.
- * These stubs provide minimal implementations sufficient for
- * single-threaded GPU driver operation.
+ * POSIX compatibility for Mesa 26 on AROS — all implementations
  */
-
-#include <exec/types.h>
-#include <exec/memory.h>
-#include <proto/exec.h>
-#include <string.h>
-#include <stdlib.h>
+#include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
-/* ============================================================
- * pthreads — single-threaded stubs
- * ============================================================ */
+/* pthreads */
+static void *tls_values[256];
+int pthread_mutex_init(void *m, const void *a) { (void)m; (void)a; return 0; }
+int pthread_mutex_destroy(void *m) { (void)m; return 0; }
+int pthread_mutex_lock(void *m) { (void)m; return 0; }
+int pthread_mutex_unlock(void *m) { (void)m; return 0; }
+int pthread_mutex_trylock(void *m) { (void)m; return 0; }
+int pthread_mutex_timedlock(void *m, const void *t) { (void)m; (void)t; return 0; }
+int pthread_mutexattr_init(void *a) { (void)a; return 0; }
+int pthread_mutexattr_settype(void *a, int t) { (void)a; (void)t; return 0; }
+int pthread_mutexattr_destroy(void *a) { (void)a; return 0; }
+int pthread_rwlock_init(void *l, const void *a) { (void)l; (void)a; return 0; }
+int pthread_rwlock_destroy(void *l) { (void)l; return 0; }
+int pthread_rwlock_rdlock(void *l) { (void)l; return 0; }
+int pthread_rwlock_wrlock(void *l) { (void)l; return 0; }
+int pthread_rwlock_unlock(void *l) { (void)l; return 0; }
+int pthread_once(int *o, void (*f)(void)) { if (o && !*o) { f(); *o = 1; } return 0; }
+int pthread_key_create(unsigned int *k, void (*d)(void *)) { static unsigned int n = 0; *k = n++; (void)d; return 0; }
+int pthread_key_delete(unsigned int k) { (void)k; return 0; }
+void *pthread_getspecific(unsigned int k) { return (k < 256) ? tls_values[k] : NULL; }
+int pthread_setspecific(unsigned int k, const void *v) { if (k < 256) tls_values[k] = (void *)v; return 0; }
+unsigned long pthread_self(void) { return 1; }
+int pthread_equal(unsigned long a, unsigned long b) { return a == b; }
+int pthread_create(void *t, const void *a, void *(*f)(void*), void *arg) { (void)t; (void)a; (void)f; (void)arg; return -1; }
+int pthread_join(unsigned long t, void **r) { (void)t; (void)r; return -1; }
+int pthread_detach(unsigned long t) { (void)t; return 0; }
+void pthread_exit(void *r) { (void)r; while(1); }
+int pthread_cond_init(void *c, const void *a) { (void)c; (void)a; return 0; }
+int pthread_cond_destroy(void *c) { (void)c; return 0; }
+int pthread_cond_wait(void *c, void *m) { (void)c; (void)m; return 0; }
+int pthread_cond_signal(void *c) { (void)c; return 0; }
+int pthread_cond_broadcast(void *c) { (void)c; return 0; }
+int pthread_cond_timedwait(void *c, void *m, const void *t) { (void)c; (void)m; (void)t; return 0; }
+int pthread_condattr_init(void *a) { (void)a; return 0; }
+int pthread_condattr_setclock(void *a, int c) { (void)a; (void)c; return 0; }
+int pthread_condattr_destroy(void *a) { (void)a; return 0; }
+int pthread_attr_init(void *a) { (void)a; return 0; }
+int pthread_attr_destroy(void *a) { (void)a; return 0; }
+int pthread_attr_setdetachstate(void *a, int s) { (void)a; (void)s; return 0; }
+int pthread_barrier_init(void *b, const void *a, unsigned c) { (void)b; (void)a; (void)c; return 0; }
+int pthread_barrier_destroy(void *b) { (void)b; return 0; }
+int pthread_barrier_wait(void *b) { (void)b; return 0; }
+int pthread_setaffinity_np(unsigned long t, size_t s, const void *c) { (void)t; (void)s; (void)c; return 0; }
 
-typedef int pthread_mutex_t;
-typedef int pthread_mutexattr_t;
-typedef int pthread_once_t;
-typedef int pthread_key_t;
-typedef unsigned long pthread_t;
-typedef int pthread_cond_t;
-typedef int pthread_condattr_t;
+/* semaphore */
+int sem_init(int *s, int p, unsigned v) { (void)p; *s = v; return 0; }
+int sem_destroy(int *s) { (void)s; return 0; }
+int sem_wait(int *s) { (void)s; return 0; }
+int sem_post(int *s) { (void)s; return 0; }
+int sem_timedwait(int *s, const void *t) { (void)s; (void)t; return 0; }
 
-int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a) { (void)m; (void)a; return 0; }
-int pthread_mutex_destroy(pthread_mutex_t *m) { (void)m; return 0; }
-int pthread_mutex_lock(pthread_mutex_t *m) { (void)m; return 0; }
-int pthread_mutex_unlock(pthread_mutex_t *m) { (void)m; return 0; }
-int pthread_mutexattr_init(pthread_mutexattr_t *a) { (void)a; return 0; }
-int pthread_mutexattr_settype(pthread_mutexattr_t *a, int t) { (void)a; (void)t; return 0; }
-int pthread_mutexattr_destroy(pthread_mutexattr_t *a) { (void)a; return 0; }
-
-int pthread_once(pthread_once_t *o, void (*f)(void)) { if (!*o) { f(); *o = 1; } return 0; }
-
-static void *tls_values[64];
-int pthread_key_create(pthread_key_t *k, void (*d)(void *)) { static int next = 0; *k = next++; (void)d; return 0; }
-int pthread_key_delete(pthread_key_t k) { (void)k; return 0; }
-void *pthread_getspecific(pthread_key_t k) { return (k < 64) ? tls_values[k] : NULL; }
-int pthread_setspecific(pthread_key_t k, const void *v) { if (k < 64) tls_values[k] = (void *)v; return 0; }
-
-pthread_t pthread_self(void) { return 1; }
-int pthread_equal(pthread_t a, pthread_t b) { return a == b; }
-
-int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a) { (void)c; (void)a; return 0; }
-int pthread_cond_destroy(pthread_cond_t *c) { (void)c; return 0; }
-int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m) { (void)c; (void)m; return 0; }
-int pthread_cond_signal(pthread_cond_t *c) { (void)c; return 0; }
-int pthread_cond_broadcast(pthread_cond_t *c) { (void)c; return 0; }
-
-/* ============================================================
- * mmap — map to AllocVec
- * ============================================================ */
-
-#define PROT_READ  1
-#define PROT_WRITE 2
-#define PROT_EXEC  4
-#define MAP_PRIVATE   0x02
-#define MAP_ANONYMOUS 0x20
-#define MAP_FAILED ((void *)-1)
-
-void *mmap(void *addr, size_t len, int prot, int flags, int fd, long offset)
-{
-    (void)addr; (void)prot; (void)flags; (void)fd; (void)offset;
-    void *p = AllocVec(len, MEMF_CLEAR | MEMF_PUBLIC);
-    return p ? p : MAP_FAILED;
+/* mmap */
+void *mmap(void *a, size_t l, int p, int f, int fd, long o) {
+    (void)a; (void)p; (void)f; (void)fd; (void)o;
+    return malloc(l);
 }
+int munmap(void *a, size_t l) { (void)l; free(a); return 0; }
+int mprotect(void *a, size_t l, int p) { (void)a; (void)l; (void)p; return 0; }
 
-int munmap(void *addr, size_t len)
-{
-    (void)len;
-    if (addr && addr != MAP_FAILED)
-        FreeVec(addr);
-    return 0;
-}
-
-int mprotect(void *addr, size_t len, int prot)
-{
-    (void)addr; (void)len; (void)prot;
-    return 0;
-}
-
-/* ============================================================
- * clock — ARM Generic Timer
- * ============================================================ */
-
-#define CLOCK_MONOTONIC 1
-
-struct timespec {
-    long tv_sec;
-    long tv_nsec;
-};
-
-int clock_gettime(int clk, struct timespec *ts)
-{
+/* clock */
+int clock_gettime(int clk, void *ts) {
     uint64_t cnt, freq;
+    long *t = (long *)ts;
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(cnt));
     __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(freq));
-    ts->tv_sec = cnt / freq;
-    ts->tv_nsec = ((cnt % freq) * 1000000000ULL) / freq;
+    t[0] = cnt / freq;
+    t[1] = ((cnt % freq) * 1000000000ULL) / freq;
+    (void)clk;
     return 0;
 }
 
-/* ============================================================
- * dlopen — not supported (static linking)
- * ============================================================ */
-
-void *dlopen(const char *f, int flags) { (void)f; (void)flags; return NULL; }
+/* dl */
+void *dlopen(const char *f, int fl) { (void)f; (void)fl; return NULL; }
 void *dlsym(void *h, const char *s) { (void)h; (void)s; return NULL; }
 int dlclose(void *h) { (void)h; return 0; }
-char *dlerror(void) { return "dlopen not supported on AROS"; }
+char *dlerror(void) { return "not supported"; }
 
-/* ============================================================
- * DRM — stubs (we use v3d_ioctl_aros instead)
- * ============================================================ */
-
-int drmIoctl(int fd, unsigned long req, void *arg) { (void)fd; (void)req; (void)arg; return -1; }
-int drmSyncobjCreate(int fd, uint32_t f, uint32_t *h) { *h = 1; (void)fd; (void)f; return 0; }
-int drmSyncobjDestroy(int fd, uint32_t h) { (void)fd; (void)h; return 0; }
-int drmSyncobjWait(int fd, uint32_t *h, uint32_t c, int64_t t, uint32_t f, uint32_t *r)
-    { (void)fd; (void)h; (void)c; (void)t; (void)f; (void)r; return 0; }
-int drmPrimeHandleToFD(int fd, uint32_t h, uint32_t f, int *pfd)
-    { (void)fd; (void)h; (void)f; *pfd = -1; return -1; }
-int drmPrimeFDToHandle(int fd, int pfd, uint32_t *h)
-    { (void)fd; (void)pfd; *h = 0; return -1; }
-
-/* ============================================================
- * Misc POSIX
- * ============================================================ */
-
+/* misc */
 int getpagesize(void) { return 4096; }
-long sysconf(int name) { (void)name; return 4096; }
-
-struct sysinfo { unsigned long totalram; };
-int sysinfo(struct sysinfo *i) { i->totalram = 1024*1024*1024; return 0; }
-
-int posix_memalign(void **ptr, size_t align, size_t size)
-{
-    /* Simple implementation — over-allocate and align */
-    void *p = AllocVec(size + align, MEMF_PUBLIC);
+long sysconf(int n) { (void)n; return 4096; }
+int posix_memalign(void **ptr, size_t align, size_t size) {
+    void *p = malloc(size + align);
     if (!p) return -1;
     *ptr = (void *)(((uintptr_t)p + align - 1) & ~(align - 1));
     return 0;
 }
+unsigned int sleep(unsigned int s) { (void)s; return 0; }
+int usleep(unsigned int u) { (void)u; return 0; }
+int pipe(int fd[2]) { fd[0] = fd[1] = -1; return -1; }
+int fcntl(int fd, int cmd, ...) { (void)fd; (void)cmd; return -1; }
+char *getenv(const char *n) { (void)n; return NULL; }
+int setenv(const char *n, const char *v, int o) { (void)n; (void)v; (void)o; return 0; }
+int unsetenv(const char *n) { (void)n; return 0; }
+
+/* File I/O stubs */
+int mkstemp(char *t) { (void)t; return -1; }
+int ftruncate(int fd, long l) { (void)fd; (void)l; return -1; }
+int asprintf(char **s, const char *fmt, ...) { *s = malloc(256); if (!*s) return -1; return 0; }
+char *realpath(const char *p, char *r) { if (r) { strcpy(r, p ? p : ""); return r; } return NULL; }
+int dup(int fd) { (void)fd; return -1; }
+
+int mkstemps(char *t, int s) { (void)t; (void)s; return -1; }
+int fchmod(int fd, unsigned int m) { (void)fd; (void)m; return 0; }
+int symlink(const char *t, const char *l) { (void)t; (void)l; return -1; }
+int readlink(const char *p, char *b, size_t s) { (void)p; (void)b; (void)s; return -1; }
+int getpwuid_r(unsigned int uid, void *pwd, char *buf, size_t len, void **res) {
+    (void)uid; (void)pwd; (void)buf; (void)len; *res = NULL; return -1;
+}
+
+#include <stdio.h>
+FILE *fdopen(int fd, const char *mode) { (void)fd; (void)mode; return NULL; }
+const char *util_get_process_name(void) { return "AROS"; }
+FILE *open_memstream(char **p, size_t *s) { (void)p; (void)s; return NULL; }
+int clock_nanosleep(int c, int f, const void *r, void *rm) { (void)c; (void)f; (void)r; (void)rm; return 0; }
