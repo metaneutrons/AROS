@@ -258,7 +258,11 @@ struct PCIController {
 #define HCB_STOP_CTRL	                3	                    /* Control transfers stopped	*/
 #define HCF_STOP_CTRL	                (1 << HCB_STOP_CTRL)
 #define HCB_ABORT	                    4	                    /* Aborted requests available	*/
+#define HCB_PLATFORM	                5	                    /* Platform device (no PCI)	*/
+#define HCF_PLATFORM	                (1 << HCB_PLATFORM)
 #define HCF_ABORT	                    (1 << HCB_ABORT)
+#define HCB_PLATFORM	                5	                    /* Platform device (no PCI)	*/
+#define HCF_PLATFORM	                (1 << HCB_PLATFORM)
 #define HCB_MSI	                        12	                    /* MSI interrupt in use         */
 #define HCF_MSI	                        (1 << HCB_MSI)
 #define HCB_PPC	                        13	                    /* Per-Port Power	            */

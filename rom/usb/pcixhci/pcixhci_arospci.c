@@ -197,6 +197,32 @@ BOOL pciInit(struct PCIDevice *hd)
         root = OOP_NewObject(NULL, CLID_HW_Root, NULL);
     pciusbDebug("PCI", "HW Root @  0x%p\n", root);
     XHCIControllerOOPStartup(hd);
+
+    /* Probe platform xHCI controllers (RP1 on RPi5) */
+    {
+        struct Library *rp1usb = OpenResource("rp1usb.resource");
+        if (rp1usb) {
+            IPTR *fields = (IPTR *)((UBYTE *)rp1usb + sizeof(struct Library));
+            if (fields[2]) { /* present */
+                IPTR bases[2] = { fields[0], fields[1] }; /* usb0, usb1 */
+                int i;
+                for (i = 0; i < 2; i++) {
+                    if (bases[i]) {
+                        struct PCIController *hc = AllocPooled(hd->hd_MemPool, sizeof(struct PCIController));
+                        if (hc) {
+                            hc->hc_Device = hd;
+                            hc->hc_RegBase = (volatile APTR)bases[i];
+                            hc->hc_Flags = HCF_PLATFORM;
+                            hc->hc_FunctionNum = i;
+                            hc->hc_PCIIntLine = 0; /* IRQ handled separately */
+                            AddTail(&hd->hd_TempHCIList, &hc->hc_Node);
+                            pciusbDebug("PCI", "RP1 platform xHCI%d @ 0x%p\n", i, bases[i]);
+                        }
+                    }
+                }
+            }
+        }
+    }
     pciusbDebug("PCI", "xHCI USB Controller class @  0x%p\n", hd->hd_USBXHCIControllerClass);
 
     // Create units with a list of host controllers having the same bus and device number.

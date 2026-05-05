@@ -7,3 +7,7 @@ USER_LDFLAGS := -static
 %build_module mmake=kernel-rp1 \
   modname=rp1 modtype=resource \
   files="rp1_init"
+
+%build_module mmake=kernel-rp1usb \
+  modname=rp1usb modtype=resource \
+  files="rp1_usb" conffile=rp1usb.conf

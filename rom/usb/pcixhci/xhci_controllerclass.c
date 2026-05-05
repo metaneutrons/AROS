@@ -74,7 +74,10 @@ static BOOL XHCIController__Init(struct PCIController *hc)
     hc->hc_CPrivate = xhcic;
 
     /* Initialize hardware... */
-    OOP_GetAttr(hc->hc_PCIDeviceObject, aHidd_PCIDevice_Base0, (IPTR *)&hc->hc_RegBase);
+    if (!(hc->hc_Flags & HCF_PLATFORM)) {
+        OOP_GetAttr(hc->hc_PCIDeviceObject, aHidd_PCIDevice_Base0, (IPTR *)&hc->hc_RegBase);
+    }
+    /* For platform devices, hc_RegBase is pre-set by the platform init code */
     xhciregs = (volatile struct xhci_hccapr *)hc->hc_RegBase;
 
     if(hc->hc_Unit) {
@@ -97,7 +100,9 @@ static BOOL XHCIController__Init(struct PCIController *hc)
     xhcic->xhc_XHCIIntR  = (APTR)((IPTR)xhciregs + AROS_LE2LONG(xhciregs->rrsoff) + 0x20);
     pciusbXHCIDebug("xHCI", DEBUGCOLOR_SET "  Interrupt Registers @ 0x%p" DEBUGCOLOR_RESET" \n", xhcic->xhc_XHCIIntR);
 
-    OOP_SetAttrs(hc->hc_PCIDeviceObject, (struct TagItem *)pciMemEnableAttrs); /* activate memory */
+    if (!(hc->hc_Flags & HCF_PLATFORM)) {
+        OOP_SetAttrs(hc->hc_PCIDeviceObject, (struct TagItem *)pciMemEnableAttrs); /* activate memory */
+    }
 
     /* Cache capability parameters once */
     ULONG hcsparams1 = AROS_LE2LONG(xhciregs->hcsparams1);
