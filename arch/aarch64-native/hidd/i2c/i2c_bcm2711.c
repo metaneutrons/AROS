@@ -17,7 +17,7 @@
 
 #include LC_LIBDEFS_FILE
 
-#define PERIBASE 0xFE000000
+
 
 APTR KernelBase __attribute__((used)) = NULL;
 
@@ -93,7 +93,8 @@ void METHOD(I2CBCM2711, Hidd_I2C, WriteRead)
  */
 static int I2CBCM2711_Init(LIBBASETYPEPTR LIBBASE)
 {
-    IPTR gpio_base = PERIBASE + GPIO_OFFSET;
+    IPTR peribase = KrnGetSystemAttr(KATTR_PeripheralBase);
+    IPTR gpio_base = peribase + GPIO_OFFSET;
     ULONG tmp;
 
     D(bug("[I2C] BCM2711 I2C Init\n"));
@@ -102,7 +103,7 @@ static int I2CBCM2711_Init(LIBBASETYPEPTR LIBBASE)
     if (!KernelBase)
         return FALSE;
 
-    LIBBASE->i2c_RegBase = PERIBASE + BSC1_OFFSET;
+    LIBBASE->i2c_RegBase = peribase + BSC1_OFFSET;
 
     /* Set GPIO 2/3 to ALT0 (I2C1 SDA/SCL) */
     tmp = AROS_LE2LONG(*(volatile ULONG *)(gpio_base + GPFSEL0_OFF));

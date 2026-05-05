@@ -11,17 +11,18 @@
 #include <exec/types.h>
 #include <proto/exec.h>
 #include <proto/kernel.h>
+#include <proto/kernel.h>
 
 #include "rng_private.h"
 
 #include LC_LIBDEFS_FILE
 
-#define PERIBASE 0xFE000000
+
 #define RNG_OFFSET 0x104000
 
 static int RNG_Init(LIBBASETYPEPTR LIBBASE)
 {
-    IPTR base = PERIBASE + RNG_OFFSET;
+    IPTR base = KrnGetSystemAttr(KATTR_PeripheralBase) + RNG_OFFSET;
 
     D(bug("[RNG] Init: base=0x%p\n", base));
 

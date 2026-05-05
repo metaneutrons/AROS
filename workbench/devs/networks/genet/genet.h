@@ -15,7 +15,7 @@
 #define GENET_PORT_NAME     "BCM GENET I/O"
 
 /* BCM2711 GENET base address (from DTB, typically 0xFD580000) */
-#define GENET_BASE_DEFAULT  0xFD580000
+#define GENET_BASE_DEFAULT  0xFD580000  /* RPi4; RPi5 uses RP1 */
 #define GENET_SIZE          0x10000
 
 /* Max units (only 1 GENET on RPi4) */

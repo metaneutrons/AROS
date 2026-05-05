@@ -207,7 +207,7 @@ struct GENETUnit *genet_CreateUnit(struct GENETBase *base, ULONG unitnum)
 
     unit->gn_UnitNum = unitnum;
     unit->gn_Device = base;
-    unit->gn_RegBase = GENET_BASE_DEFAULT;
+    unit->gn_RegBase = (IPTR)KrnGetSystemAttr(KATTR_PeripheralBase) == 0xFE000000 ? GENET_BASE_DEFAULT : 0;
     unit->gn_PhyAddr = GENET_PHY_ADDR;
 
     InitSemaphore(&unit->gn_Lock);

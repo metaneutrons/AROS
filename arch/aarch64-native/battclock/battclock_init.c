@@ -12,6 +12,7 @@
 #include <aros/libcall.h>
 #include <exec/types.h>
 #include <proto/exec.h>
+#include <proto/kernel.h>
 #include <hidd/i2c.h>
 
 #include "battclock_intern.h"
@@ -97,7 +98,7 @@ static void amiga_to_datetime(ULONG time, ULONG *year, ULONG *month,
  * I2C read: write register address, then read bytes.
  * Uses direct BSC1 register access (same as our I2C HIDD).
  */
-#define PERIBASE    0xFE000000
+#define PERIBASE KrnGetSystemAttr(KATTR_PeripheralBase)
 #define BSC1_BASE   (PERIBASE + 0x804000)
 #define BSC_CONTROL 0x00
 #define BSC_STATUS  0x04
