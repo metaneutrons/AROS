@@ -146,3 +146,10 @@ char *strftime_stub(char *s, unsigned long m, const char *f, const void *t) { (v
 void *gmtime(const long *t) { (void)t; return NULL; }
 void *localtime_simple(const long *t) { (void)t; return NULL; }
 unsigned long strftime(char *s, unsigned long m, const char *f, const void *t) { (void)f; (void)t; if(s && m) s[0]=0; return 0; }
+int setpriority(int w, int who, int p) { (void)w; (void)who; (void)p; return 0; }
+int gettimeofday(struct timeval *tv, void *tz) { (void)tz; if(tv){tv->tv_sec=0;tv->tv_usec=0;} return 0; }
+int pthread_getcpuclockid(unsigned long t, int *c) { (void)t; *c = 1; return 0; }
+int sched_getcpu(void) { return 0; }
+int pthread_sigmask(int h, const void *s, void *o) { (void)h; (void)s; (void)o; return 0; }
+int pthread_setname_np(unsigned long t, const char *n) { (void)t; (void)n; return 0; }
+int flock(int fd, int op) { (void)fd; (void)op; return 0; }

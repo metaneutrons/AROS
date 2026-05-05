@@ -74,6 +74,10 @@ int pthread_barrier_destroy(pthread_barrier_t *b);
 int pthread_barrier_wait(pthread_barrier_t *b);
 
 int pthread_setaffinity_np(pthread_t t, size_t s, const void *c);
+int pthread_getcpuclockid(unsigned long thread, int *clockid);
+int pthread_sigmask(int how, const void *set, void *oldset);
+int pthread_setname_np(unsigned long thread, const char *name);
+#define PTHREAD_BARRIER_SERIAL_THREAD -1
 
 #define _POSIX_THREADS 200112L
 #define PTHREAD_COND_INITIALIZER 0

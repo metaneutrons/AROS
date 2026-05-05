@@ -1,3 +1,6 @@
+#define _SC_PHYS_PAGES 85
+#undef __STRICT_ANSI__
+#include <unistd.h>
 #include <time.h>
 #include <aros/types/timespec_s.h>
 #ifdef __cplusplus
@@ -55,6 +58,11 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 #endif
 
 #ifdef __cplusplus
+/* sysconf */
+long sysconf(int name);
+int setpriority(int which, int who, int prio);
+int flock(int fd, int operation);
+#define PRIO_PROCESS 0
 /* epoll */
 #ifndef EPOLL_CTL_ADD
 #define EPOLL_CTL_ADD 1
