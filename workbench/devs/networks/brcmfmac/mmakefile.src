@@ -1,0 +1,15 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+#MM- workbench-devs-networks-brcmfmac-aarch64 : workbench-devs-networks-brcmfmac
+
+FILES := handler sdio firmware fullmac
+
+USER_LDFLAGS := -static
+
+%build_module mmake=workbench-devs-networks-brcmfmac \
+    modname=brcmfmac modtype=device \
+    files="brcmfmac_init $(FILES)" \
+    moduledir=Devs/Networks
+
+%common
