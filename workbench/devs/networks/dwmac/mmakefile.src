@@ -1,0 +1,15 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+#MM- workbench-devs-networks-dwmac-aarch64 : workbench-devs-networks-dwmac
+
+FILES := handler dwmac_hw
+
+USER_LDFLAGS := -static
+
+%build_module mmake=workbench-devs-networks-dwmac \
+    modname=dwmac modtype=device \
+    files="dwmac_init $(FILES)" \
+    moduledir=Devs/Networks
+
+%common
