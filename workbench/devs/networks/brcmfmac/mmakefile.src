@@ -3,7 +3,7 @@ include $(SRCDIR)/config/aros.cfg
 
 #MM- workbench-devs-networks-brcmfmac-aarch64 : workbench-devs-networks-brcmfmac
 
-FILES := handler sdio firmware fullmac
+FILES := handler sdio firmware fullmac firmware_bin
 
 USER_LDFLAGS := -static
 
