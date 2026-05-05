@@ -19,9 +19,9 @@
  * This is used during clock/PWM setup where we need short delays
  * but cannot use Delay() (which needs DOS and is too coarse).
  */
-static void udelay(ULONG peribase, ULONG us)
+static void udelay(IPTR peribase, ULONG us)
 {
-    volatile ULONG *clo = (volatile ULONG *) (ULONG) (peribase + 0x003004);
+    volatile ULONG *clo = (volatile ULONG *)(peribase + 0x003004);
     ULONG start = AROS_LE2LONG(*clo);
 
     while ((AROS_LE2LONG(*clo) - start) < us)
@@ -41,7 +41,7 @@ static void udelay(ULONG peribase, ULONG us)
  * These pins are routed to the 3.5mm headphone jack on Pi 3B via a
  * low-pass RC filter on the board.
  */
-void pwm_gpio_setup(ULONG peribase)
+void pwm_gpio_setup(IPTR peribase)
 {
     ULONG gpfsel4_addr = peribase + 0x200010; /* GPFSEL4 */
     ULONG val;
@@ -62,7 +62,7 @@ void pwm_gpio_setup(ULONG peribase)
 /*
  * Restore GPIO pins 40 and 45 to input (default safe state).
  */
-void pwm_gpio_restore(ULONG peribase)
+void pwm_gpio_restore(IPTR peribase)
 {
     ULONG gpfsel4_addr = peribase + 0x200010; /* GPFSEL4 */
     ULONG val;
@@ -87,7 +87,7 @@ void pwm_gpio_restore(ULONG peribase)
  * We use MASH=1 (1-stage MASH noise-shaping) for fractional division,
  * which gives better audio quality than integer-only division.
  */
-void pwm_clock_setup(ULONG peribase, ULONG samplerate, ULONG range)
+void pwm_clock_setup(IPTR peribase, ULONG samplerate, ULONG range)
 {
     ULONG cm_ctl_addr = peribase + 0x1010A0; /* CM_PWMCTL */
     ULONG cm_div_addr = peribase + 0x1010A4; /* CM_PWMDIV */
@@ -125,7 +125,7 @@ void pwm_clock_setup(ULONG peribase, ULONG samplerate, ULONG range)
 /*
  * Stop the PWM clock.
  */
-void pwm_clock_stop(ULONG peribase)
+void pwm_clock_stop(IPTR peribase)
 {
     ULONG cm_ctl_addr = peribase + 0x1010A0;
 
@@ -150,7 +150,7 @@ void pwm_clock_stop(ULONG peribase)
  * only asserts when channels are active. DMA must be started promptly
  * after this call to feed the FIFO before it underruns.
  */
-void pwm_init(ULONG peribase, ULONG range)
+void pwm_init(IPTR peribase, ULONG range)
 {
     ULONG pwm_base = peribase + 0x20C000;
 
@@ -191,7 +191,7 @@ void pwm_init(ULONG peribase, ULONG range)
 /*
  * Stop the PWM peripheral.
  */
-void pwm_stop(ULONG peribase)
+void pwm_stop(IPTR peribase)
 {
     ULONG pwm_base = peribase + 0x20C000;
 
@@ -217,7 +217,7 @@ void pwm_stop(ULONG peribase)
  * Each CB generates an interrupt on completion so the slave task
  * knows to refill the consumed buffer.
  */
-void dma_build_control_blocks(struct RPiPWMData *dd, ULONG peribase)
+void dma_build_control_blocks(struct RPiPWMData *dd)
 {
     int i;
 
@@ -227,12 +227,12 @@ void dma_build_control_blocks(struct RPiPWMData *dd, ULONG peribase)
         cb->ti = DMA_TI_INTEN | DMA_TI_WAIT_RESP | DMA_TI_DEST_DREQ | DMA_TI_SRC_INC | DMA_TI_PERMAP(DMA_DREQ_PWM) |
                  DMA_TI_NO_WIDE_BURSTS;
 
-        cb->source_ad = GPU_BUS_ADDR(dd->dmabuf[i]);
+        cb->source_ad = gpu_bus_addr((IPTR)dd->dmabuf[i]);
         cb->dest_ad = PWM_FIF1_BUS;
         cb->txfr_len = dd->dmabuf_size;
         cb->stride = 0;
         /* Chain to the other CB */
-        cb->nextconbk = GPU_BUS_ADDR(dd->cb[1 - i]);
+        cb->nextconbk = gpu_bus_addr((IPTR)dd->cb[1 - i]);
         cb->reserved[0] = 0;
         cb->reserved[1] = 0;
     }
@@ -241,10 +241,10 @@ void dma_build_control_blocks(struct RPiPWMData *dd, ULONG peribase)
 /*
  * Start DMA on the specified channel.
  */
-void dma_setup(ULONG peribase, ULONG channel, ULONG cb_bus_addr)
+void dma_setup(IPTR peribase, ULONG channel, ULONG cb_bus_addr)
 {
-    ULONG dma_base = peribase + 0x007000 + channel * 0x100;
-    ULONG enable_addr = peribase + 0x007FF0;
+    IPTR dma_base = peribase + 0x007000 + channel * 0x100;
+    IPTR enable_addr = peribase + 0x007FF0;
 
     /* Enable the DMA channel */
     wr32le(enable_addr, rd32le(enable_addr) | (1 << channel));
@@ -267,9 +267,9 @@ void dma_setup(ULONG peribase, ULONG channel, ULONG cb_bus_addr)
 /*
  * Stop DMA on the specified channel.
  */
-void dma_stop(ULONG peribase, ULONG channel)
+void dma_stop(IPTR peribase, ULONG channel)
 {
-    ULONG dma_base = peribase + 0x007000 + channel * 0x100;
+    IPTR dma_base = peribase + 0x007000 + channel * 0x100;
 
     /* Deactivate first, then reset */
     wr32le(dma_base + 0x00, 0); /* Clear ACTIVE */

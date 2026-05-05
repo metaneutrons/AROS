@@ -5,4 +5,15 @@ include $(SRCDIR)/config/aros.cfg
   modname=exec pri=0 arch=raspi-aarch64 \
   includes="-I$(SRCDIR)/$(CURDIR)"
 
+%get_archincludes modname=kernel \
+    includeflag=TARGET_KERNEL_INCLUDES maindir=rom/kernel
+
+USER_INCLUDES := $(TARGET_KERNEL_INCLUDES) -I$(SRCDIR)/rom/exec
+
+FILES := coldreboot
+
+%build_archspecific \
+  mainmmake=kernel-exec maindir=rom/exec \
+  arch=raspi-aarch64 files="$(FILES)" modname=exec
+
 %common

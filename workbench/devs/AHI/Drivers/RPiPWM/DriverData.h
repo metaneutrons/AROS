@@ -26,7 +26,7 @@ struct DMAControlBlock {
 struct RPiPWMBase {
     struct DriverBase driverbase;
     struct DosLibrary *dosbase;
-    ULONG periiobase;
+    IPTR periiobase;
 };
 
 #define DRIVERBASE_SIZEOF (sizeof(struct RPiPWMBase))
@@ -47,7 +47,7 @@ struct RPiPWMData {
     struct RPiPWMBase *ahisubbase;
 
     /* Hardware state */
-    ULONG periiobase;
+    IPTR periiobase;
     ULONG dma_channel;
 
     /* DMA control blocks (32-byte aligned) */

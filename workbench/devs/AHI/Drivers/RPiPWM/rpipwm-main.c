@@ -61,7 +61,7 @@ _AHIsub_AllocAudio(struct TagItem *taglist, struct AHIAudioCtrlDrv *AudioCtrl, s
 {
     struct RPiPWMBase *RPiPWMBase = (struct RPiPWMBase *) AHIsubBase;
 
-    AudioCtrl->ahiac_DriverData = AllocVec(sizeof(struct RPiPWMData), MEMF_CLEAR | MEMF_PUBLIC);
+    AudioCtrl->ahiac_DriverData = AllocVec(sizeof(struct RPiPWMData), MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
 
     if (dd != NULL) {
         dd->slavesignal = -1;
@@ -160,7 +160,7 @@ _AHIsub_Start(ULONG flags, struct AHIAudioCtrlDrv *AudioCtrl, struct DriverBase 
 
         /* Allocate DMA buffers (need physical contiguous memory) */
         for (i = 0; i < 2; i++) {
-            dd->dmabuf[i] = AllocVec(buf_bytes, MEMF_CLEAR | MEMF_PUBLIC);
+            dd->dmabuf[i] = AllocVec(buf_bytes, MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
             if (dd->dmabuf[i] == NULL)
                 return AHIE_NOMEM;
         }
@@ -171,19 +171,19 @@ _AHIsub_Start(ULONG flags, struct AHIAudioCtrlDrv *AudioCtrl, struct DriverBase 
          * Allocate enough for 2 CBs + alignment padding.
          */
         cb_alloc_size = sizeof(struct DMAControlBlock) * 2 + 32;
-        cb_raw = AllocVec(cb_alloc_size, MEMF_CLEAR | MEMF_PUBLIC);
+        cb_raw = AllocVec(cb_alloc_size, MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
         if (cb_raw == NULL)
             return AHIE_NOMEM;
 
         dd->cb_base = (struct DMAControlBlock *) cb_raw;
 
         /* Align to 32 bytes */
-        cb_raw = (UBYTE *) (((ULONG) cb_raw + 31) & ~31);
+        cb_raw = (UBYTE *) (((IPTR)cb_raw + 31) & ~31);
         dd->cb[0] = (struct DMAControlBlock *) cb_raw;
         dd->cb[1] = (struct DMAControlBlock *) (cb_raw + sizeof(struct DMAControlBlock));
 
         /* Build the DMA control block chain */
-        dma_build_control_blocks(dd, dd->periiobase);
+        dma_build_control_blocks(dd);
 
         /*
          * Flush DMA control blocks and buffers from ARM data cache
@@ -231,7 +231,7 @@ _AHIsub_Start(ULONG flags, struct AHIAudioCtrlDrv *AudioCtrl, struct DriverBase 
          */
         dd->irq_handle = KrnAddIRQHandler(BCM_IRQ_DMA0 + dd->dma_channel, dma_irq_handler, dd, SysBase);
 
-        dma_setup(dd->periiobase, dd->dma_channel, GPU_BUS_ADDR(dd->cb[0]));
+        dma_setup(dd->periiobase, dd->dma_channel, gpu_bus_addr((IPTR)dd->cb[0]));
     }
 
     if (flags & AHISF_RECORD) {

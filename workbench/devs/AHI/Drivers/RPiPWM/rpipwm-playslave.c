@@ -72,7 +72,7 @@ static void convert_mix_to_pwm(WORD *src, ULONG *dst, ULONG frames, ULONG range)
 void dma_irq_handler(struct RPiPWMData *data, void *data2)
 {
     struct ExecBase *SysBase = (struct ExecBase *) data2;
-    ULONG dma_base = data->periiobase + 0x007000 + data->dma_channel * 0x100;
+    IPTR dma_base = data->periiobase + 0x007000 + data->dma_channel * 0x100;
     ULONG cs = rd32le(dma_base + 0x00);
 
     if (cs & DMA_CS_INT) {
@@ -190,11 +190,11 @@ void Slave(struct ExecBase *SysBase)
                  * write to the buffer the DMA is currently reading.
                  */
                 {
-                    ULONG dma_base = dd->periiobase + 0x007000 + dd->dma_channel * 0x100;
+                    IPTR dma_base = dd->periiobase + 0x007000 + dd->dma_channel * 0x100;
                     ULONG cbaddr = rd32le(dma_base + 0x04);
                     ULONG fillbuf;
 
-                    if (cbaddr == GPU_BUS_ADDR(dd->cb[0]))
+                    if (cbaddr == gpu_bus_addr((IPTR)dd->cb[0]))
                         fillbuf = 1; /* DMA on CB[0] → fill dmabuf[1] */
                     else
                         fillbuf = 0; /* DMA on CB[1] → fill dmabuf[0] */

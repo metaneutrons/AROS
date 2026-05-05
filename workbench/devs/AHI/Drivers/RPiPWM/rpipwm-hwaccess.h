@@ -8,22 +8,33 @@
 
 /*
  * GPU bus address for uncached DMA access.
- * On BCM2835/2836, ARM physical 0x00000000 maps to GPU bus 0xC0000000
- * (uncached alias).
+ * ARM physical addresses in the low 1GB map to GPU bus via 0xC0000000 alias.
  */
-#define GPU_BUS_ADDR(x) (0xC0000000 | (ULONG) (x))
+static inline ULONG gpu_bus_addr(IPTR arm_phys)
+{
+    return 0xC0000000 | (ULONG)(arm_phys & 0x3FFFFFFF);
+}
 
-/* Register access helpers (little-endian, with ARM memory barriers) */
+/* Register access helpers with memory barriers */
 static inline void __dsb(void)
 {
+#ifdef __aarch64__
+    asm volatile("dsb sy" ::: "memory");
+#else
     asm volatile("dsb" ::: "memory");
-}
-static inline void __dmb(void)
-{
-    asm volatile("dmb" ::: "memory");
+#endif
 }
 
-static inline ULONG rd32le(ULONG addr)
+static inline void __dmb(void)
+{
+#ifdef __aarch64__
+    asm volatile("dmb sy" ::: "memory");
+#else
+    asm volatile("dmb" ::: "memory");
+#endif
+}
+
+static inline ULONG rd32le(IPTR addr)
 {
     ULONG val;
     __dmb();
@@ -32,7 +43,7 @@ static inline ULONG rd32le(ULONG addr)
     return val;
 }
 
-static inline void wr32le(ULONG addr, ULONG val)
+static inline void wr32le(IPTR addr, ULONG val)
 {
     __dsb();
     *(volatile ULONG *) addr = AROS_LONG2LE(val);
@@ -45,17 +56,13 @@ static inline void wr32le(ULONG addr, ULONG val)
 /* DMA channel to use for audio (channel 5, avoiding GPU-reserved 0-3) */
 #define PWM_DMA_CHANNEL 5
 
-/* PLLD clock frequency (500 MHz on BCM2835/2836) */
+/* PLLD clock frequency (500 MHz on BCM2835/2836/2711) */
 #define PLLD_FREQ 500000000
 
-/*
- * BCM2835 DMA IRQ numbers.
- * DMA channel N uses GPU IRQ (16 + N).
- * These match the IRQ_DMA0..IRQ_DMA12 defines in bcm2708.h.
- */
+/* BCM2835 DMA IRQ: channel N uses GPU IRQ (16 + N) */
 #define BCM_IRQ_DMA0 16
 
-/* DMA control block TI bits (local defines for self-contained build) */
+/* DMA control block TI bits */
 #define DMA_TI_INTEN          (1 << 0)
 #define DMA_TI_WAIT_RESP      (1 << 3)
 #define DMA_TI_DEST_DREQ      (1 << 6)
@@ -71,7 +78,7 @@ static inline void wr32le(ULONG addr, ULONG val)
 #define DMA_CS_PANIC_PRI(x)    (((x) & 0xF) << 20)
 #define DMA_CS_PRI(x)          (((x) & 0xF) << 16)
 #define DMA_CS_ABORT           (1 << 30)
-#define DMA_CS_RESET           (1 << 31)
+#define DMA_CS_RESET           (1U << 31)
 
 /* PWM CTL bits */
 #define PWM_CTL_PWEN1 (1 << 0)
@@ -83,7 +90,7 @@ static inline void wr32le(ULONG addr, ULONG val)
 #define PWM_CTL_USEF2 (1 << 13)
 
 /* PWM DMAC bits */
-#define PWM_DMAC_ENAB     (1 << 31)
+#define PWM_DMAC_ENAB     (1U << 31)
 #define PWM_DMAC_PANIC(x) (((x) & 0xFF) << 8)
 #define PWM_DMAC_DREQ(x)  (((x) & 0xFF) << 0)
 
@@ -101,17 +108,17 @@ static inline void wr32le(ULONG addr, ULONG val)
 #define PWM_FIF1_BUS 0x7E20C018
 
 /* Hardware setup/teardown functions */
-void pwm_gpio_setup(ULONG peribase);
-void pwm_gpio_restore(ULONG peribase);
-void pwm_clock_setup(ULONG peribase, ULONG samplerate, ULONG range);
-void pwm_clock_stop(ULONG peribase);
-void pwm_init(ULONG peribase, ULONG range);
-void pwm_stop(ULONG peribase);
-void dma_setup(ULONG peribase, ULONG channel, ULONG cb_bus_addr);
-void dma_stop(ULONG peribase, ULONG channel);
+void pwm_gpio_setup(IPTR peribase);
+void pwm_gpio_restore(IPTR peribase);
+void pwm_clock_setup(IPTR peribase, ULONG samplerate, ULONG range);
+void pwm_clock_stop(IPTR peribase);
+void pwm_init(IPTR peribase, ULONG range);
+void pwm_stop(IPTR peribase);
+void dma_setup(IPTR peribase, ULONG channel, ULONG cb_bus_addr);
+void dma_stop(IPTR peribase, ULONG channel);
 
 /* Build DMA control blocks for double-buffered PWM playback */
-void dma_build_control_blocks(struct RPiPWMData *dd, ULONG peribase);
+void dma_build_control_blocks(struct RPiPWMData *dd);
 
 /* DMA interrupt handler (called from KrnAddIRQHandler) */
 void dma_irq_handler(struct RPiPWMData *data, void *data2);
