@@ -67,13 +67,23 @@ int mprotect(void *a, size_t l, int p) { (void)a; (void)l; (void)p; return 0; }
 
 /* clock */
 int clock_gettime(int clk, void *ts) {
-    uint64_t cnt, freq;
     long *t = (long *)ts;
+    (void)clk;
+#ifdef __aarch64__
+    uint64_t cnt, freq;
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(cnt));
     __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(freq));
     t[0] = cnt / freq;
     t[1] = ((cnt % freq) * 1000000000ULL) / freq;
-    (void)clk;
+#elif defined(__x86_64__) || defined(__i386__)
+    /* x86: use rdtsc (approximate, ~3GHz assumed) */
+    uint64_t tsc;
+    __asm__ volatile("rdtsc" : "=A"(tsc));
+    t[0] = tsc / 3000000000ULL;
+    t[1] = ((tsc % 3000000000ULL) * 1000000000ULL) / 3000000000ULL;
+#else
+    t[0] = 0; t[1] = 0;
+#endif
     return 0;
 }
 

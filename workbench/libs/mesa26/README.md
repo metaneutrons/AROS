@@ -54,3 +54,24 @@ The new approach:
 
 - **v3d** — VideoCore VI (RPi4, V3D 4.2) and VideoCore VII (RPi5, V3D 7.1)
 - **softpipe** — Software fallback renderer
+
+## x86_64 Support
+
+For x86_64 AROS, use `aros-x86_64.cross` with different Gallium drivers:
+
+```bash
+meson setup builddir external/mesa \
+    --cross-file workbench/libs/mesa26/aros-x86_64.cross \
+    --default-library=static \
+    -Dgallium-drivers=iris,nouveau,radeonsi,softpipe \
+    -Dvulkan-drivers= \
+    ...
+```
+
+Supported x86 GPU drivers:
+- **iris** — Intel Gen 8+ (Broadwell and newer)
+- **crocus** — Intel Gen 4-7 (older Intel)
+- **nouveau** — NVIDIA (all generations)
+- **radeonsi** — AMD GCN+ (Radeon HD 7000+)
+- **r600** — AMD R600/Evergreen/Northern Islands
+- **softpipe** — Software fallback
