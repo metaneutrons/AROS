@@ -1,0 +1,11 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+USER_INCLUDES := -I$(SRCDIR)/arch/aarch64-native/kernel
+USER_LDFLAGS := -static
+
+%build_module mmake=hidd-i2c-dw \
+  modname=i2c-dw modtype=hidd \
+  files="i2c_dw"
+
+%common
