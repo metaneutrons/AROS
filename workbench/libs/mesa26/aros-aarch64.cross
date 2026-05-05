@@ -21,8 +21,8 @@ strip = '@CROSSTOOLS@/aarch64-aros-strip'
 pkgconfig = 'false'
 
 [built-in options]
-c_args = ['-fpthread', '-isystem', '@SRCDIR@/workbench/libs/mesa26/include', '-isystem', '@SRCDIR@/workbench/libs/mesa26/include/sys', '-include', '@SRCDIR@/workbench/libs/mesa26/include/aros_mesa_posix.h', '-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM', '-D__linux__']
-cpp_args = [ '-isystem', '@SRCDIR@/workbench/libs/mesa26/include', '-isystem', '@SRCDIR@/workbench/libs/mesa26/include/sys', '-include', '@SRCDIR@/workbench/libs/mesa26/include/aros_mesa_posix.h', '-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM', '-D__linux__']
+c_args = ['-fpthread', '-isystem', '@SRCDIR@/workbench/libs/mesa26/include', '-include', '@SRCDIR@/workbench/libs/mesa26/include/aros_mesa_posix.h', '-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM', '-D__linux__', '-DHAVE_PTHREAD', '-Wno-error=format']
+cpp_args = [ '-isystem', '@SRCDIR@/workbench/libs/mesa26/include', '-include', '@SRCDIR@/workbench/libs/mesa26/include/aros_mesa_posix.h', '-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM', '-D__linux__', '-DHAVE_PTHREAD', '-Wno-error=format']
 c_link_args = ['-static']
 cpp_link_args = ['-static']
 
