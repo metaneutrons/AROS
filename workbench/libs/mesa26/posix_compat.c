@@ -120,3 +120,6 @@ FILE *fdopen(int fd, const char *mode) { (void)fd; (void)mode; return NULL; }
 const char *util_get_process_name(void) { return "AROS"; }
 FILE *open_memstream(char **p, size_t *s) { (void)p; (void)s; return NULL; }
 int clock_nanosleep(int c, int f, const void *r, void *rm) { (void)c; (void)f; (void)r; (void)rm; return 0; }
+int nanosleep(const void *r, void *rm) { (void)r; (void)rm; return 0; }
+void *localtime_r(const void *t, void *r) { (void)t; return r; }
+long syscall(long n, ...) { (void)n; return -1; }
