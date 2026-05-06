@@ -103,9 +103,11 @@ BOOL FNAME_SDCBUS(StartUnit)(struct sdcard_Unit *sdcUnit)
 
         if (sdcUnit->sdcu_Flags & AF_Card_MMC)
         {
-            if (sdcUnit->sdcu_Flags & AF_Card_HighSpeed)
+            if (sdcUnit->sdcu_Flags & AF_Card_HS200)
+                FNAME_SDCBUS(SetClock)(200000000, sdcUnit->sdcu_Bus);
+            else if (sdcUnit->sdcu_Flags & AF_Card_HighSpeed)
             {
-                if (sdcUnit->sdcu_Flags & AB_Card_HighSpeed52)
+                if (sdcUnit->sdcu_Flags & AF_Card_HighSpeed52)
                     FNAME_SDCBUS(SetClock)(52000000, sdcUnit->sdcu_Bus);
                 else
                     FNAME_SDCBUS(SetClock)(26000000, sdcUnit->sdcu_Bus);

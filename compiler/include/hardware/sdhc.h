@@ -128,6 +128,37 @@
 #define SDHCI_CAN_VDD_300               (1 << 25)
 #define SDHCI_CAN_VDD_180               (1 << 26)
 #define SDHCI_CAN_64BIT                 (1 << 27)
+/* Host Control 2 — UHS/HS200 mode selection (SDHCI 3.0+) */
+#define SDHCI_HOST_CONTROL2             0x3E
+#define SDHCI_CTRL2_UHS_MASK            (0x7)
+#define SDHCI_CTRL2_UHS_SDR12           (0x0)
+#define SDHCI_CTRL2_UHS_SDR25           (0x1)
+#define SDHCI_CTRL2_UHS_SDR50           (0x2)
+#define SDHCI_CTRL2_UHS_SDR104          (0x3)
+#define SDHCI_CTRL2_UHS_DDR50           (0x4)
+#define SDHCI_CTRL2_UHS_HS400           (0x5)  /* eMMC only */
+#define SDHCI_CTRL2_HS200               (0x3)  /* alias: same bits as SDR104 */
+#define SDHCI_CTRL2_1V8_SIGENA          (1 << 3)
+#define SDHCI_CTRL2_EXEC_TUNING         (1 << 6)
+#define SDHCI_CTRL2_TUNED_CLK           (1 << 7)
+
+/* EXT_CSD timing values for HS200/HS400 (extends mmc.h EXT_CSD_HS_TIMING) */
+#define EXT_CSD_HS_TIMING_HS            1
+#define EXT_CSD_HS_TIMING_HS200         2
+#define EXT_CSD_HS_TIMING_HS400         3
+#define EXT_CSD_BUS_WIDTH               183
+#define EXT_CSD_BUS_WIDTH_4             1
+#define EXT_CSD_BUS_WIDTH_8             2
+
+/* MMC card type bits from EXT_CSD[196] (extends mmc.h) */
+#define MMC_HS200_1V8                   (1 << 4)
+#define MMC_HS200_1V2                   (1 << 5)
+#define MMC_HS400_1V8                   (1 << 6)
+#define MMC_HS400_1V2                   (1 << 7)
+
+/* CMD21 — Send Tuning Block (eMMC) */
+#define MMC_CMD_SEND_TUNING_BLOCK       21
+
 #define SDHCI_CAPABILITIES1             0x44
 #define SDHCI_MAX_CURRENT               0x48
 #define SDHCI_SET_ACMD12_ERROR          0x50
