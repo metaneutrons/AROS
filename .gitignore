@@ -3063,3 +3063,4 @@
 
 # /workbench/utilities/Presenter/
 /workbench/utilities/Presenter/mmakefile
+workbench/libs/mesa26/lib/*.a

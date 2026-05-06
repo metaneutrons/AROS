@@ -1,0 +1,45 @@
+# Meson cross-file for building Mesa 26 targeting AROS x86_64
+#
+# Usage:
+#   meson setup builddir ../external/mesa \
+#     --cross-file ../workbench/libs/mesa26/aros-x86_64.cross \
+#     -Dprefix=/tmp/mesa26-aros \
+#     -Dgallium-drivers=iris,nouveau,softpipe \
+#     -Dvulkan-drivers= \
+#     -Dplatforms= \
+#     -Dglx=disabled \
+#     -Degl=disabled \
+#     -Dllvm=disabled \
+#     -Dshared-glapi=disabled \
+#     -Dbuildtype=release
+
+[binaries]
+c = '@CROSSTOOLS@/x86_64-aros-gcc-wrapper'
+cpp = '@CROSSTOOLS@/x86_64-aros-g++-wrapper'
+ar = '@CROSSTOOLS@/x86_64-aros-ar'
+strip = '@CROSSTOOLS@/x86_64-aros-strip'
+pkgconfig = 'false'
+
+[built-in options]
+c_args = ['', '-isystem', '@SRCDIR@/workbench/libs/mesa26/include', '-include', '@SRCDIR@/workbench/libs/mesa26/include/aros_mesa_posix.h', '-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM', '-D__linux__', '-DHAVE_PTHREAD', '-Wno-error=format', '-DDETECT_OS_LINUX=1', '-DDETECT_OS_POSIX=1', '-DHAVE_SYSCONF=1']
+cpp_args = [ '-isystem', '@SRCDIR@/workbench/libs/mesa26/include', '-include', '@SRCDIR@/workbench/libs/mesa26/include/aros_mesa_posix.h', '-I@SRCDIR@/workbench/libs/mesa26', '-DAROS', '-DNO_DRM', '-D__linux__', '-DHAVE_PTHREAD', '-Wno-error=format', '-DDETECT_OS_LINUX=1', '-DDETECT_OS_POSIX=1', '-DHAVE_SYSCONF=1']
+c_link_args = ['-static']
+cpp_link_args = ['-static']
+
+[host_machine]
+system = 'aros'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
+
+[properties]
+sys_root = ''
+needs_exe_wrapper = true
+has_function_printf = true
+has_function_htons = true
+# AROS uses  not -pthread
+threads_dep_is_none = true
+
+# AROS doesn't use -pthread flag (pthreads are stubs linked statically)
+[cmake]
+CMAKE_THREAD_LIBS_INIT = ''
