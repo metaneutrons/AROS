@@ -6,11 +6,16 @@ USER_INCLUDES := \
     -I$(SRCDIR)/$(CURDIR) \
     -I$(SRCDIR)/$(CURDIR)/drm-stubs
 
-USER_LDFLAGS := -static $(MESA26_LIBS)
+USER_LDFLAGS := \
+    -L$(MESA26_LIBDIR) \
+    -Wl,--start-group -lv3d -lbroadcom -lbroadcom_qpu -lcompiler \
+    -lgallium -lsoftpipe -lglapi -lmesa_util -lexpat -lposix_compat \
+    -lposixc_rel -lstdc_rel \
+    -Wl,--end-group
 
 %build_module mmake=hidd-v3d \
   modname=v3d modtype=hidd \
   files="v3d_init v3d_hw v3d_galliumclass v3d_drm_shim" \
-  uselibs="posixc_rel stdc_rel"
+  alwayscxxlink=yes uselibs=""
 
 %common
