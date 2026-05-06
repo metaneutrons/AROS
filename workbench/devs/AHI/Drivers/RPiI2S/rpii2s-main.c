@@ -27,7 +27,10 @@ ULONG _AHIsub_AllocAudio(struct TagItem *taglist, struct AHIAudioCtrlDrv *AudioC
         dd->mastertask = (struct Process *)FindTask(NULL);
         dd->ahisubbase = RPiI2SBase;
         dd->periiobase = RPiI2SBase->periiobase;
-        dd->i2s_base = dd->periiobase + BCM_I2S_OFFSET;
+        if (dd->periiobase >= 0x107C000000)
+            dd->i2s_base = dd->periiobase + RP1_I2S_OFFSET;
+        else
+            dd->i2s_base = dd->periiobase + BCM_I2S_OFFSET;
         dd->dma_channel = I2S_DMA_CHANNEL;
     } else return AHISF_ERROR;
     if (dd->mastersignal == -1) return AHISF_ERROR;
