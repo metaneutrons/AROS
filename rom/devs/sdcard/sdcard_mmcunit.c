@@ -83,8 +83,20 @@ ULONG FNAME_SDCUNIT(MMCChangeFrequency)(struct sdcard_Unit *sdcUnit)
         D(bug("[SDCard%02ld] %s: Card supports HS200, attempting switch\n",
               sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
 
-        /* Set bus width to 4-bit before HS200 switch (required by spec) */
-        if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_4, sdcUnit) != -1)
+        /* Set bus width to 8-bit if controller supports it, else 4-bit */
+        if (sdcUnit->sdcu_Bus->sdcb_Capabilities & SDHCI_CAN_DO_8BIT)
+        {
+            if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_8, sdcUnit) != -1)
+            {
+                UBYTE hostCtrl = sdcUnit->sdcu_Bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, sdcUnit->sdcu_Bus);
+                hostCtrl |= SDHCI_HCTRL_8BITBUS;
+                sdcUnit->sdcu_Bus->sdcb_IOWriteByte(SDHCI_HOST_CONTROL, hostCtrl, sdcUnit->sdcu_Bus);
+                sdcUnit->sdcu_Flags |= AF_Card_4bitData;  /* implies wide bus */
+                D(bug("[SDCard%02ld] %s: 8-bit bus width enabled\n",
+                      sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
+            }
+        }
+        else if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_4, sdcUnit) != -1)
         {
             UBYTE hostCtrl = sdcUnit->sdcu_Bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, sdcUnit->sdcu_Bus);
             hostCtrl |= SDHCI_HCTRL_4BITBUS;
