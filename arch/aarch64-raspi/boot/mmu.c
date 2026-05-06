@@ -214,5 +214,50 @@ void mmu_load(void)
     __asm__ volatile("msr sctlr_el1, %0" : : "r"(sctlr));
     __asm__ volatile("isb" ::: "memory");
 
+    /*
+     * CPU-specific performance tuning.
+     * These are implementation-defined registers — safe to write on
+     * Cortex-A72 (RPi4) and Cortex-A76 (RPi5), ignored on QEMU.
+     *
+     * CPUACTLR_EL1 (S3_1_C15_C2_0) — Cortex-A72:
+     *   [44]    = Disable L1 data prefetch throttling
+     *   [25:24] = L1 data prefetch control (11 = aggressive)
+     *
+     * CPUECTLR_EL1 (S3_1_C15_C2_1) — Cortex-A72/A76:
+     *   [6]     = Enable hardware prefetch of L2 to L1
+     *   [5:4]   = L2 data prefetch distance (11 = max)
+     *   [2]     = Enable L2 TLB prefetch
+     */
+    {
+        uint64_t midr;
+        __asm__ volatile("mrs %0, midr_el1" : "=r"(midr));
+        unsigned int part = (midr >> 4) & 0xFFF;
+
+        if (part == 0xD08)  /* Cortex-A72 (RPi4) */
+        {
+            uint64_t actlr, ectlr;
+            __asm__ volatile("mrs %0, S3_1_C15_C2_0" : "=r"(actlr));
+            actlr |= (1UL << 44);       /* Disable prefetch throttling */
+            actlr |= (3UL << 24);       /* Aggressive L1 data prefetch */
+            __asm__ volatile("msr S3_1_C15_C2_0, %0" : : "r"(actlr));
+
+            __asm__ volatile("mrs %0, S3_1_C15_C2_1" : "=r"(ectlr));
+            ectlr |= (1UL << 6);        /* L2-to-L1 prefetch enable */
+            ectlr |= (3UL << 4);        /* Max L2 prefetch distance */
+            ectlr |= (1UL << 2);        /* L2 TLB prefetch */
+            __asm__ volatile("msr S3_1_C15_C2_1, %0" : : "r"(ectlr));
+            __asm__ volatile("isb");
+        }
+        else if (part == 0xD0B)  /* Cortex-A76 (RPi5) */
+        {
+            uint64_t ectlr;
+            __asm__ volatile("mrs %0, S3_1_C15_C2_1" : "=r"(ectlr));
+            ectlr |= (1UL << 6);        /* L2-to-L1 prefetch enable */
+            ectlr |= (3UL << 4);        /* Max L2 prefetch distance */
+            __asm__ volatile("msr S3_1_C15_C2_1, %0" : : "r"(ectlr));
+            __asm__ volatile("isb");
+        }
+    }
+
     kprintf("[BOOT] MMU enabled\n");
 }
