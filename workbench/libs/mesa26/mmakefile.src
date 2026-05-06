@@ -1,0 +1,30 @@
+
+include $(SRCDIR)/config/aros.cfg
+
+MESA26_SRCDIR := $(SRCDIR)/external/mesa
+MESA26_BUILDDIR := $(TOP)/mesa26-build
+MESA26_LIBDIR := $(SRCDIR)/workbench/libs/mesa26/lib
+
+# Marker file that indicates Mesa 26 libs are built
+MESA26_STAMP := $(MESA26_LIBDIR)/.built
+
+#MM mesa26-libs : mesa26-libs-build
+
+#MM
+mesa26-libs-build : $(MESA26_STAMP)
+
+$(MESA26_STAMP) :
+	@$(ECHO) "Building Mesa 26.0.6 for AROS..."
+	@cd $(SRCDIR)/workbench/libs/mesa26 && \
+	    CROSSTOOLS=$(CROSSTOOLSDIR) \
+	    AROS_SRCDIR=$(SRCDIR) \
+	    MESA_BUILDDIR=$(MESA26_BUILDDIR) \
+	    bash build.sh
+	@$(TOUCH) $@
+
+#MM
+mesa26-libs-clean :
+	@$(RM) -rf $(MESA26_BUILDDIR) $(MESA26_STAMP)
+	@$(RM) -f $(MESA26_LIBDIR)/*.a
+
+%common

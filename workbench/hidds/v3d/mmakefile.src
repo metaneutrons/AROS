@@ -13,6 +13,8 @@ USER_LDFLAGS := \
     -lposixc_rel -lstdc_rel \
     -Wl,--end-group
 
+#MM hidd-v3d : mesa26-libs
+
 %build_module mmake=hidd-v3d \
   modname=v3d modtype=hidd \
   files="v3d_init v3d_hw v3d_galliumclass v3d_drm_shim" \
