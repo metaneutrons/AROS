@@ -48,7 +48,9 @@ BOOL DriverInit(struct DriverBase *AHIsubBase)
      * Detect SoC variant from peripheral base address.
      * BCM2711 (RPi4) uses 0xFE000000, all earlier SoCs use lower addresses.
      */
-    if (RPiHDMIBase->periiobase >= 0xFE000000)
+    if (RPiHDMIBase->periiobase >= 0x107C000000)
+        RPiHDMIBase->variant = VARIANT_BCM2712;
+    else if (RPiHDMIBase->periiobase >= 0xFE000000)
         RPiHDMIBase->variant = VARIANT_BCM2711;
     else
         RPiHDMIBase->variant = VARIANT_BCM2835;

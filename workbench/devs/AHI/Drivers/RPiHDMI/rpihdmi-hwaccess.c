@@ -29,7 +29,11 @@ static void udelay(IPTR peribase, ULONG us)
  */
 void hdmi_setup_bases(struct RPiHDMIData *dd)
 {
-    if (dd->variant == VARIANT_BCM2711) {
+    if (dd->variant == VARIANT_BCM2712) {
+        dd->hd_base   = dd->periiobase + VC6_HD_OFFSET;
+        dd->hdmi_base = dd->periiobase + VC6_HDMI_OFFSET;
+        dd->ram_base  = dd->periiobase + VC6_HDMI_OFFSET;
+    } else if (dd->variant == VARIANT_BCM2711) {
         dd->hd_base   = dd->periiobase + VC5_HD_OFFSET;
         dd->hdmi_base = dd->periiobase + VC5_HDMI_OFFSET;
         dd->ram_base  = dd->periiobase + VC5_HDMI_OFFSET;

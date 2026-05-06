@@ -25,7 +25,8 @@ struct DMAControlBlock {
  */
 enum RPiHDMIVariant {
     VARIANT_BCM2835 = 0,  /* RPi 1/2/3: peribase 0x20000000 / 0x3F000000 */
-    VARIANT_BCM2711 = 1,  /* RPi 4:     peribase 0xFE000000 */
+    VARIANT_BCM2711 = 1,  /* RPi4: peribase 0xFE000000 */
+    VARIANT_BCM2712 = 2,  /* RPi5: peribase 0x107C000000 */  /* RPi 4:     peribase 0xFE000000 */
 };
 
 /*

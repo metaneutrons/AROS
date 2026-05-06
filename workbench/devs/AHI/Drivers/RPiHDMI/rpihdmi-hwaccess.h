@@ -114,14 +114,39 @@ static inline void wr32le(IPTR addr, ULONG val)
 #define VC5_HDMI_RAM_PKT_START     0x0400  /* Relative to RAM base */
 
 /*
+ * Register offsets for BCM2712 (VC6) HDMI0
+ * From Linux vc6_hdmi_hdmi0_fields[].
+ * MAI registers are identical to VC5!
+ */
+#define VC6_HD_OFFSET       0x800000
+#define VC6_HDMI_OFFSET     0x802000
+
+#define VC6_HD_MAI_CTL      0x0010  /* Same as VC5 */
+#define VC6_HD_MAI_THR      0x0014
+#define VC6_HD_MAI_FMT      0x0018
+#define VC6_HD_MAI_DATA     0x001C
+#define VC6_HD_MAI_SMP      0x0020
+
+#define VC6_HDMI_MAI_CHANNEL_MAP   0x00A4
+#define VC6_HDMI_MAI_CONFIG        0x00A8
+#define VC6_HDMI_AUDIO_PKT_CFG     0x00C0
+#define VC6_HDMI_RAM_PKT_CFG       0x00C4
+#define VC6_HDMI_RAM_PKT_STATUS    0x00CC
+#define VC6_HDMI_CRP_CFG           0x00D0
+#define VC6_HDMI_CTS_0             0x00D4
+#define VC6_HDMI_CTS_1             0x00D8
+#define VC6_HDMI_SCHEDULER_CONTROL 0x00E8
+#define VC6_HDMI_RAM_PKT_START     0x0400
+
+/*
  * Accessor macros that select the correct offset based on variant.
  * dd->hd_base, dd->hdmi_base, dd->ram_base are pre-computed.
  */
 #define HD_REG(dd, vc4_off, vc5_off) \
-    ((dd)->hd_base + ((dd)->variant == VARIANT_BCM2711 ? (vc5_off) : (vc4_off)))
+    ((dd)->hd_base + ((dd)->variant >= VARIANT_BCM2711 ? (vc5_off) : (vc4_off)))
 
 #define HDMI_REG(dd, vc4_off, vc5_off) \
-    ((dd)->hdmi_base + ((dd)->variant == VARIANT_BCM2711 ? (vc5_off) : (vc4_off)))
+    ((dd)->hdmi_base + ((dd)->variant >= VARIANT_BCM2711 ? (vc5_off) : (vc4_off)))
 
 /* Convenience register accessors */
 #define REG_MAI_CTL(dd)          HD_REG(dd, VC4_HD_MAI_CTL, VC5_HD_MAI_CTL)
@@ -141,9 +166,33 @@ static inline void wr32le(IPTR addr, ULONG val)
 
 /* RAM packet start — on BCM2711 this is at a fixed offset in the HDMI core block */
 #define REG_RAM_PKT_START(dd) \
-    ((dd)->variant == VARIANT_BCM2711 \
-        ? ((dd)->hdmi_base + VC5_HDMI_RAM_PKT_START) \
-        : ((dd)->hdmi_base + VC4_HDMI_RAM_PKT_START))
+    ((dd)->hdmi_base + ((dd)->variant >= VARIANT_BCM2711 \
+        ? VC5_HDMI_RAM_PKT_START : VC4_HDMI_RAM_PKT_START))
+
+/*
+ * Register offsets for BCM2712 (VC6) HDMI0
+ * From Linux vc6_hdmi_hdmi0_fields[].
+ * MAI registers are identical to VC5!
+ */
+#define VC6_HD_OFFSET       0x800000
+#define VC6_HDMI_OFFSET     0x802000
+
+#define VC6_HD_MAI_CTL      0x0010  /* Same as VC5 */
+#define VC6_HD_MAI_THR      0x0014
+#define VC6_HD_MAI_FMT      0x0018
+#define VC6_HD_MAI_DATA     0x001C
+#define VC6_HD_MAI_SMP      0x0020
+
+#define VC6_HDMI_MAI_CHANNEL_MAP   0x00A4
+#define VC6_HDMI_MAI_CONFIG        0x00A8
+#define VC6_HDMI_AUDIO_PKT_CFG     0x00C0
+#define VC6_HDMI_RAM_PKT_CFG       0x00C4
+#define VC6_HDMI_RAM_PKT_STATUS    0x00CC
+#define VC6_HDMI_CRP_CFG           0x00D0
+#define VC6_HDMI_CTS_0             0x00D4
+#define VC6_HDMI_CTS_1             0x00D8
+#define VC6_HDMI_SCHEDULER_CONTROL 0x00E8
+#define VC6_HDMI_RAM_PKT_START     0x0400
 
 /* MAI_CTL bits */
 #define MAI_CTL_RESET    (1 << 0)
