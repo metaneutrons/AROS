@@ -4,6 +4,7 @@
 #include <proto/kernel.h>
 #include "library.h"
 #include "DriverData.h"
+#define DOSBase (*(struct DosLibrary **) &RPiI2SBase->dosbase)
 
 APTR KernelBase = NULL;
 

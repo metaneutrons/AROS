@@ -15,7 +15,6 @@ struct RPiI2SBase {
     IPTR periiobase;
 };
 #define DRIVERBASE_SIZEOF (sizeof(struct RPiI2SBase))
-#define DOSBase (*(struct DosLibrary **) &RPiI2SBase->dosbase)
 
 struct RPiI2SData {
     struct DriverData driverdata;

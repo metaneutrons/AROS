@@ -36,9 +36,6 @@ static inline void genet_clr(struct GENETUnit *unit, ULONG off, ULONG bits)
     genet_wr(unit, off, genet_rd(unit, off) & ~bits);
 }
 
-    for (i = 0; i < us * 10; i++)
-        ;
-}
 
 /* ============================================================
  * UMAC Reset
