@@ -166,22 +166,30 @@ void mmu_load(void)
     __asm__ volatile("dsb sy" ::: "memory");
 
     /*
-     * BCM2712 (RPi5) peripherals at 0x107C000000 (GB index 4).
-     * Map as 1GB device block if not already covered.
-     * With 40-bit VA (T0SZ=24), L1 can have up to 512 entries.
+     * BCM2712 (RPi5) peripherals live at 0x107C000000 (GB index 4).
+     * Extend to 40-bit VA/PA only when running on Cortex-A76 (RPi5).
+     * QEMU's raspi4b does not support 40-bit PA and will fault.
      */
+    int use_40bit = 0;
     {
-        unsigned int bcm2712_gb = 4; /* 0x100000000 .. 0x13FFFFFFF */
-        uint64_t *l2 = alloc_page_table();
-        if (l2) {
-            memset(l2, 0, PAGE_SIZE);
-            for (mb = 0; mb < ENTRIES_PER_TABLE; mb++) {
-                uint64_t addr = (uint64_t)bcm2712_gb * L1_BLOCK_SIZE +
-                                (uint64_t)mb * L2_BLOCK_SIZE;
-                l2[mb] = block_desc(addr, ATTR_DEVICE, DESC_SH_OUTER);
+        uint64_t midr;
+        __asm__ volatile("mrs %0, midr_el1" : "=r"(midr));
+        /* Cortex-A76 part number = 0xD0B (ARM implementer 0x41) */
+        if (((midr >> 4) & 0xFFF) == 0xD0B)
+        {
+            use_40bit = 1;
+            unsigned int bcm2712_gb = 4;
+            uint64_t *l2 = alloc_page_table();
+            if (l2) {
+                memset(l2, 0, PAGE_SIZE);
+                for (mb = 0; mb < ENTRIES_PER_TABLE; mb++) {
+                    uint64_t addr = (uint64_t)bcm2712_gb * L1_BLOCK_SIZE +
+                                    (uint64_t)mb * L2_BLOCK_SIZE;
+                    l2[mb] = block_desc(addr, ATTR_DEVICE, DESC_SH_OUTER);
+                }
+                l1_table[bcm2712_gb] = DESC_VALID | DESC_TABLE |
+                                        ((uint64_t)l2 & 0x0000FFFFFFFFF000UL);
             }
-            l1_table[bcm2712_gb] = DESC_VALID | DESC_TABLE |
-                                    ((uint64_t)l2 & 0x0000FFFFFFFFF000UL);
         }
     }
 
@@ -191,9 +199,10 @@ void mmu_load(void)
     /* Program system registers — ARM ARM D13.2 */
     __asm__ volatile("msr mair_el1, %0" : : "r"(MAIR_VALUE));
 
-    uint64_t tcr = TCR_T0SZ_40BIT | TCR_TG0_4KB | TCR_SH0_INNER |
+    uint64_t tcr = (use_40bit ? TCR_T0SZ_40BIT : TCR_T0SZ_36BIT) |
+                   TCR_TG0_4KB | TCR_SH0_INNER |
                    TCR_ORGN0_WB_ALLOC | TCR_IRGN0_WB_ALLOC |
-                   TCR_EPD1 | TCR_IPS_1TB;
+                   TCR_EPD1 | (use_40bit ? TCR_IPS_1TB : TCR_IPS_64GB);
     __asm__ volatile("msr tcr_el1, %0" : : "r"(tcr));
     __asm__ volatile("msr ttbr0_el1, %0" : : "r"((uint64_t)l1_table));
     __asm__ volatile("tlbi vmalle1; dsb sy; isb" ::: "memory");
