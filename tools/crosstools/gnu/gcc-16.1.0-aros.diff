@@ -2677,3 +2677,17 @@ diff -ruN gcc-16-20260308/libstdc++-v3/include/std/ratio gcc-16-20260308.aros/li
        static constexpr int __shift = __builtin_clzll(__d);
        static constexpr int __coshift_ = sizeof(uintmax_t) * 8 - __shift;
        static constexpr int __coshift = (__shift != 0) ? __coshift_ : 0;
+
+--- a/libgcc/config/aarch64/aarch64-unwind.h.orig
++++ b/libgcc/config/aarch64/aarch64-unwind.h
+@@ -0,0 +1,10 @@
++/* AROS: Stub for PAC/BTI return address signing state toggle.
++   AROS doesn't use pointer authentication, so this is a no-op. */
++#ifndef AARCH64_UNWIND_H
++#define AARCH64_UNWIND_H
++static inline void
++aarch64_fs_ra_state_toggle (struct _Unwind_Context *context __attribute__((unused)))
++{
++  /* No-op on AROS — no pointer authentication */
++}
++#endif
