@@ -136,9 +136,6 @@ Requires: `workbench-libs-libssh` and `workbench-libs-mbedtls` built first.
 
 ## Limitations
 
-- No Ed25519 keys yet (mbedTLS PSA Crypto API needed)
 - No SSH agent forwarding
 - No X11 forwarding
 - No port forwarding / tunneling
-- Interactive shell uses simple I/O bridge (no full PTY emulation)
-- Single-threaded server (sequential session handling per-process)
