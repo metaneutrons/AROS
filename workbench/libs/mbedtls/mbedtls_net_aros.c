@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * mbedTLS network adapter for AROS bsdsocket.library.
  * Implements mbedtls_net_* functions using Amiga socket API.
  */

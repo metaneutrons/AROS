@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ *  Author: Fabian Schmieder
  *
  * AROS SSH Client using libssh 0.12.0 + mbedTLS 3.6.6
  *

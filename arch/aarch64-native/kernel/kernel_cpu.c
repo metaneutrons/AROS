@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ *  Author: Fabian Schmieder
 
     Desc: cpu_Switch / cpu_Dispatch for AArch64.
           Follows the x86_64-pc model: save/restore ALL registers via et_RegFrame.

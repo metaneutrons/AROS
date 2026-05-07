@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * mbedTLS configuration for AROS.
  * Minimal TLS 1.2/1.3 client with RSA + ECDSA + AES-GCM.
  * No threads, no filesystem (certs embedded or loaded via DOS).

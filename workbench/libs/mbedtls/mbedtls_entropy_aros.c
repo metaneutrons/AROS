@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * mbedTLS hardware entropy source for AROS.
  * Uses BCM2711/BCM2712 RNG200 via rng.resource, or falls back
  * to timer-based jitter entropy.

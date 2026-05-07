@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ *  Author: Fabian Schmieder
 
     Licensed under the AROS Public License (APL), Version 1.1.
 
