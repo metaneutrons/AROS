@@ -1,0 +1,43 @@
+include $(SRCDIR)/config/aros.cfg
+
+LIBSSH2_VERSION := 1.11.1
+LIBSSH2_ARCHBASE := libssh2-$(LIBSSH2_VERSION)
+LIBSSH2_SUFFIXES := tar.xz tar.gz
+LIBSSH2_REPOSITORIES := https://libssh2.org/download/
+
+LIBSSH2_SRCDIR := $(PORTSDIR)/libssh2/$(LIBSSH2_ARCHBASE)
+LIBSSH2_LIBDIR := $(GENDIR)/$(CURDIR)/lib
+LIBSSH2_INCDIR := $(LIBSSH2_SRCDIR)/include
+
+MBEDTLS_INCDIR := $(PORTSDIR)/mbedtls/mbedtls-3.6.6/include
+MBEDTLS_LIBDIR := $(GENDIR)/workbench/libs/mbedtls/lib
+
+#MM- workbench-libs-libssh2 : mbedtls-build libssh2-fetch libssh2-build
+
+%fetch mmake=libssh2-fetch archive=$(LIBSSH2_ARCHBASE) \
+    destination=$(PORTSDIR)/libssh2 suffixes=$(LIBSSH2_SUFFIXES) \
+    location=$(PORTSSOURCEDIR) archive_origins=$(LIBSSH2_REPOSITORIES)
+
+LIBSSH2_CFLAGS := -I$(LIBSSH2_INCDIR) -I$(LIBSSH2_SRCDIR)/src \
+    -I$(MBEDTLS_INCDIR) -I$(SRCDIR)/workbench/libs/mbedtls \
+    -DLIBSSH2_MBEDTLS -DHAVE_UNISTD_H -DHAVE_SYS_SOCKET_H \
+    -DHAVE_NETINET_IN_H -DHAVE_ARPA_INET_H \
+    -O2
+
+#MM
+libssh2-build : $(LIBSSH2_LIBDIR)/libssh2.a
+
+$(LIBSSH2_LIBDIR)/libssh2.a : | libssh2-fetch mbedtls-build
+	@$(MKDIR) $(LIBSSH2_LIBDIR)
+	@$(ECHO) "Building libssh2 $(LIBSSH2_VERSION) with mbedTLS..."
+	@cd $(LIBSSH2_SRCDIR)/src && \
+	    $(AROS_CROSSTOOL_PREFIX)gcc $(LIBSSH2_CFLAGS) -c \
+	        channel.c comp.c crypt.c hostkey.c kex.c mac.c misc.c \
+	        packet.c publickey.c scp.c session.c sftp.c transport.c \
+	        userauth.c version.c knownhost.c agent.c \
+	        mbedtls.c pem.c keepalive.c global.c \
+	    && $(AROS_CROSSTOOL_PREFIX)ar rcs $(LIBSSH2_LIBDIR)/libssh2.a *.o \
+	    && rm -f *.o
+	@$(ECHO) "libssh2 built: $(LIBSSH2_LIBDIR)/libssh2.a"
+
+%common

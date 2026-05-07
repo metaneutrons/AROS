@@ -1,0 +1,19 @@
+include $(SRCDIR)/config/aros.cfg
+
+LIBSSH2_INCDIR := $(PORTSDIR)/libssh2/libssh2-1.11.1/include
+LIBSSH2_LIBDIR := $(GENDIR)/workbench/libs/libssh2/lib
+MBEDTLS_LIBDIR := $(GENDIR)/workbench/libs/mbedtls/lib
+
+FILES := sshd
+
+USER_INCLUDES := -I$(LIBSSH2_INCDIR)
+USER_LDFLAGS := -L$(LIBSSH2_LIBDIR) -L$(MBEDTLS_LIBDIR) \
+    -lssh2 -lmbedtls -lmbedcrypto
+
+#MM- workbench-network-sshd : workbench-libs-libssh2
+
+%build_prog mmake=workbench-network-sshd \
+    progname=sshd targetdir=$(AROS_C) \
+    files=$(FILES)
+
+%common
