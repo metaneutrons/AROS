@@ -1,0 +1,59 @@
+include $(SRCDIR)/config/aros.cfg
+
+CURL_VERSION := 8.20.0
+CURL_ARCHBASE := curl-$(CURL_VERSION)
+CURL_SUFFIXES := tar.xz tar.gz
+CURL_REPOSITORIES := https://curl.se/download/
+
+CURL_SRCDIR := $(PORTSDIR)/curl/$(CURL_ARCHBASE)
+CURL_LIBDIR := $(GENDIR)/$(CURDIR)/lib
+CURL_INCDIR := $(CURL_SRCDIR)/include
+
+MBEDTLS_SRCDIR := $(PORTSDIR)/mbedtls/mbedtls-3.6.6
+MBEDTLS_INCDIR := $(MBEDTLS_SRCDIR)/include
+MBEDTLS_LIBDIR := $(GENDIR)/workbench/libs/mbedtls/lib
+
+#MM- workbench-libs-curl : mbedtls-build curl-fetch curl-build
+
+%fetch mmake=curl-fetch archive=$(CURL_ARCHBASE) \
+    destination=$(PORTSDIR)/curl suffixes=$(CURL_SUFFIXES) \
+    location=$(PORTSSOURCEDIR) archive_origins=$(CURL_REPOSITORIES)
+
+# curl source files for a minimal HTTP/HTTPS client library
+CURL_CFLAGS := -I$(CURL_INCDIR) -I$(CURL_SRCDIR)/lib \
+    -I$(MBEDTLS_INCDIR) -I$(SRCDIR)/workbench/libs/mbedtls \
+    -DUSE_MBEDTLS -DCURL_STATICLIB -DBUILDING_LIBCURL \
+    -DHAVE_SOCKET -DHAVE_SELECT -DHAVE_RECV -DHAVE_SEND \
+    -DHAVE_GETHOSTBYNAME -DHAVE_INET_ADDR \
+    -DHAVE_STRUCT_TIMEVAL -DHAVE_SYS_TYPES_H \
+    -DOS=\"AROS\" -DCURL_DISABLE_LDAP -DCURL_DISABLE_DICT \
+    -DCURL_DISABLE_TELNET -DCURL_DISABLE_TFTP \
+    -DCURL_DISABLE_POP3 -DCURL_DISABLE_IMAP \
+    -DCURL_DISABLE_SMTP -DCURL_DISABLE_GOPHER \
+    -DCURL_DISABLE_RTSP -DCURL_DISABLE_MQTT \
+    -O2
+
+#MM
+curl-build : $(CURL_LIBDIR)/libcurl.a
+
+$(CURL_LIBDIR)/libcurl.a : | curl-fetch mbedtls-build
+	@$(MKDIR) $(CURL_LIBDIR)
+	@$(ECHO) "Building libcurl $(CURL_VERSION) with mbedTLS..."
+	@cd $(CURL_SRCDIR)/lib && \
+	    $(AROS_CROSSTOOL_PREFIX)gcc $(CURL_CFLAGS) -c \
+	        easy.c multi.c url.c transfer.c http.c http_chunks.c \
+	        sendf.c recv.c connect.c select.c mime.c \
+	        urlapi.c setopt.c getinfo.c cookie.c \
+	        vtls/vtls.c vtls/mbedtls.c \
+	        hostip.c hostip4.c if2ip.c strerror.c \
+	        progress.c formdata.c strcase.c \
+	        parsedate.c timeval.c escape.c \
+	        headers.c bufq.c bufref.c dynbuf.c dynhds.c \
+	        cfilters.c cf-socket.c macos.c nonblock.c \
+	        version.c hash.c llist.c slist.c \
+	        share.c conncache.c doh.c request.c \
+	    && $(AROS_CROSSTOOL_PREFIX)ar rcs $(CURL_LIBDIR)/libcurl.a *.o \
+	    && rm -f *.o
+	@$(ECHO) "libcurl built: $(CURL_LIBDIR)/libcurl.a"
+
+%common
