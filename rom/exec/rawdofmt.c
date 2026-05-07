@@ -25,8 +25,8 @@
 #elif defined(__aarch64__)
 
 #define is_va_list(ap) ap.__stack
-#define null_va_list(ap) va_list ap = {0}
-#define VA_NULL {0}
+#define null_va_list(ap) va_list ap = {NULL}
+#define VA_NULL {NULL}
 
 #else
 
