@@ -232,7 +232,23 @@ SynchronousStub:
 
 .Lsync_not_svc:
     /*
-     * Non-SVC synchronous exception (data abort, etc.)
+     * Non-SVC synchronous exception.
+     * Check for FPU trap (EC=0x07) first — handle without full context save.
+     */
+    mrs     x0, esr_el1
+    lsr     x1, x0, #26            /* EC field */
+    cmp     x1, #0x07              /* EC=0x07: FP/SIMD access trap */
+    b.ne    .Lsync_not_fpu
+
+    /* FPU trap — lightweight handling, no full context save needed */
+    stp     x29, x30, [sp, #-16]!
+    bl      fpu_trap_handler
+    ldp     x29, x30, [sp], #16
+    eret
+
+.Lsync_not_fpu:
+    /*
+     * Other synchronous exception (data abort, etc.)
      * Save full context, call ExceptionHandler.
      */
     SAVE_FULL_CONTEXT

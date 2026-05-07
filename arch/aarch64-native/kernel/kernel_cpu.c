@@ -4,6 +4,11 @@
     Desc: cpu_Switch / cpu_Dispatch for AArch64.
           Follows the x86_64-pc model: save/restore ALL registers via et_RegFrame.
           Overrides the generic stubs in rom/kernel/kernel_cpu.c.
+
+    FPU: Lazy context switch — FPU is disabled (CPACR_EL1.FPEN=0) after
+    dispatch. First FPU access traps (EC=0x07), handler saves previous
+    owner's state and restores current task's state, then re-enables FPU.
+    Tasks that never use FPU pay zero save/restore cost.
 */
 
 #include <exec/execbase.h>
@@ -21,6 +26,124 @@
 
 #define AROS_NO_ATOMIC_OPERATIONS
 #include "exec_platform.h"
+
+/* Per-CPU: last task that used the FPU (owns current HW FPU state) */
+static struct Task *fpu_owner;
+
+/*
+ * fpu_save — save FPU/NEON registers to task's VFPContext.
+ */
+static inline void fpu_save(struct VFPContext *vfp)
+{
+    __asm__ volatile(
+        "stp q0,  q1,  [%0, #0x000]\n"
+        "stp q2,  q3,  [%0, #0x020]\n"
+        "stp q4,  q5,  [%0, #0x040]\n"
+        "stp q6,  q7,  [%0, #0x060]\n"
+        "stp q8,  q9,  [%0, #0x080]\n"
+        "stp q10, q11, [%0, #0x0A0]\n"
+        "stp q12, q13, [%0, #0x0C0]\n"
+        "stp q14, q15, [%0, #0x0E0]\n"
+        "stp q16, q17, [%0, #0x100]\n"
+        "stp q18, q19, [%0, #0x120]\n"
+        "stp q20, q21, [%0, #0x140]\n"
+        "stp q22, q23, [%0, #0x160]\n"
+        "stp q24, q25, [%0, #0x180]\n"
+        "stp q26, q27, [%0, #0x1A0]\n"
+        "stp q28, q29, [%0, #0x1C0]\n"
+        "stp q30, q31, [%0, #0x1E0]\n"
+        "mrs x1, fpsr\n"
+        "mrs x2, fpcr\n"
+        "str w1, [%0, #0x200]\n"
+        "str w2, [%0, #0x204]\n"
+        : : "r"(vfp) : "x1", "x2", "memory"
+    );
+}
+
+/*
+ * fpu_restore — load FPU/NEON registers from task's VFPContext.
+ */
+static inline void fpu_restore(struct VFPContext *vfp)
+{
+    __asm__ volatile(
+        "ldp q0,  q1,  [%0, #0x000]\n"
+        "ldp q2,  q3,  [%0, #0x020]\n"
+        "ldp q4,  q5,  [%0, #0x040]\n"
+        "ldp q6,  q7,  [%0, #0x060]\n"
+        "ldp q8,  q9,  [%0, #0x080]\n"
+        "ldp q10, q11, [%0, #0x0A0]\n"
+        "ldp q12, q13, [%0, #0x0C0]\n"
+        "ldp q14, q15, [%0, #0x0E0]\n"
+        "ldp q16, q17, [%0, #0x100]\n"
+        "ldp q18, q19, [%0, #0x120]\n"
+        "ldp q20, q21, [%0, #0x140]\n"
+        "ldp q22, q23, [%0, #0x160]\n"
+        "ldp q24, q25, [%0, #0x180]\n"
+        "ldp q26, q27, [%0, #0x1A0]\n"
+        "ldp q28, q29, [%0, #0x1C0]\n"
+        "ldp q30, q31, [%0, #0x1E0]\n"
+        "ldr w1, [%0, #0x200]\n"
+        "ldr w2, [%0, #0x204]\n"
+        "msr fpsr, x1\n"
+        "msr fpcr, x2\n"
+        : : "r"(vfp) : "x1", "x2", "memory"
+    );
+}
+
+/*
+ * fpu_disable — trap next FPU access (CPACR_EL1.FPEN = 0b00).
+ */
+static inline void fpu_disable(void)
+{
+    uint64_t cpacr;
+    __asm__ volatile("mrs %0, cpacr_el1" : "=r"(cpacr));
+    cpacr &= ~(3UL << 20);
+    __asm__ volatile("msr cpacr_el1, %0; isb" : : "r"(cpacr));
+}
+
+/*
+ * fpu_enable — allow FPU access (CPACR_EL1.FPEN = 0b11).
+ */
+static inline void fpu_enable(void)
+{
+    uint64_t cpacr;
+    __asm__ volatile("mrs %0, cpacr_el1" : "=r"(cpacr));
+    cpacr |= (3UL << 20);
+    __asm__ volatile("msr cpacr_el1, %0; isb" : : "r"(cpacr));
+}
+
+/*
+ * fpu_trap_handler — called when a task accesses FPU while disabled.
+ * ESR_EL1 EC=0x07 (FP/SIMD access trap).
+ * Saves previous owner's FPU state, restores current task's, enables FPU.
+ */
+void fpu_trap_handler(void)
+{
+    struct Task *task = GET_THIS_TASK;
+    if (!task) return;
+
+    /* Save previous owner's FPU state */
+    if (fpu_owner && fpu_owner != task)
+    {
+        struct ExceptionContext *octx = fpu_owner->tc_UnionETask.tc_ETask->et_RegFrame;
+        if (octx && octx->fpuContext)
+        {
+            fpu_save((struct VFPContext *)octx->fpuContext);
+            octx->Flags |= ECF_FPU;
+        }
+    }
+
+    /* Restore current task's FPU state (if it has one) */
+    if ((task->tc_Flags & TF_ETASK) && task->tc_UnionETask.tc_ETask->et_RegFrame)
+    {
+        struct ExceptionContext *ctx = task->tc_UnionETask.tc_ETask->et_RegFrame;
+        if (ctx->fpuContext && (ctx->Flags & ECF_FPU))
+            fpu_restore((struct VFPContext *)ctx->fpuContext);
+    }
+
+    fpu_owner = task;
+    fpu_enable();
+}
 
 /*
  * cpu_Switch — save current task's register state.
@@ -116,6 +239,15 @@ void cpu_Dispatch(regs_t *regs)
          */
         regs->pstate &= ~(1UL << 7);  /* Clear DAIF.I */
     }
+
+    /*
+     * Lazy FPU: disable FPU access for the new task. If it uses FPU,
+     * the trap handler (EC=0x07) will save the previous owner's state
+     * and restore this task's state on demand.
+     * Skip if this task already owns the FPU (common case: same task re-dispatched).
+     */
+    if (task != fpu_owner)
+        fpu_disable();
 }
 
 #if defined(__AROSEXEC_SMP__)
