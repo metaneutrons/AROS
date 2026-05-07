@@ -23,3 +23,6 @@ VOID DriverCleanup(struct DriverBase *AHIsubBase) {
     struct RPiI2SBase *RPiI2SBase = (struct RPiI2SBase *)AHIsubBase;
     CloseLibrary((struct Library *)DOSBase);
 }
+
+/* Stub for AROS symbol set handler (not needed for static AHI drivers) */
+int __LIBS__symbol_set_handler_missing = 0;

@@ -88,6 +88,7 @@ endif
 ifeq ($(host_cpu),arm)
 SUBDIRS		+= RPiPWM
 SUBDIRS		+= RPiHDMI
+SUBDIRS		+= RPiI2S
 endif
 
 ifeq ($(host_cpu),aarch64)

@@ -1,4 +1,6 @@
 #include <config.h>
+#define DRIVER_NEEDS_GLOBAL_EXECBASE
+#define DRIVER_LIBSTUB
 #include <devices/ahi.h>
 #include <exec/execbase.h>
 #include <libraries/ahi_sub.h>
@@ -9,7 +11,6 @@
 #include "rpii2s-hwaccess.h"
 
 #define dd ((struct RPiI2SData *) AudioCtrl->ahiac_DriverData)
-#undef SysBase
 
 void dma_irq_handler(struct RPiI2SData *data, void *data2) {
     struct ExecBase *SysBase = (struct ExecBase *)data2;
