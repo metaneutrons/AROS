@@ -1,19 +1,21 @@
 include $(SRCDIR)/config/aros.cfg
 
-LIBSSH2_INCDIR := $(PORTSDIR)/libssh2/libssh2-1.11.1/include
-LIBSSH2_LIBDIR := $(GENDIR)/workbench/libs/libssh2/lib
+LIBSSH_INCDIR := $(PORTSDIR)/libssh/libssh-0.12.0/include
+LIBSSH_LIBDIR := $(GENDIR)/workbench/libs/libssh/lib
 MBEDTLS_LIBDIR := $(GENDIR)/workbench/libs/mbedtls/lib
 
-FILES := sshd
+USER_INCLUDES := -I$(LIBSSH_INCDIR)
+USER_LDFLAGS := -L$(LIBSSH_LIBDIR) -L$(MBEDTLS_LIBDIR) \
+    -lssh -lmbedtls -lmbedcrypto
 
-USER_INCLUDES := -I$(LIBSSH2_INCDIR)
-USER_LDFLAGS := -L$(LIBSSH2_LIBDIR) -L$(MBEDTLS_LIBDIR) \
-    -lssh2 -lmbedtls -lmbedcrypto
-
-#MM- workbench-network-sshd : workbench-libs-libssh2
+#MM- workbench-network-sshd : workbench-libs-libssh
 
 %build_prog mmake=workbench-network-sshd \
     progname=sshd targetdir=$(AROS_C) \
-    files=$(FILES)
+    files="sshd"
+
+%build_prog mmake=workbench-network-ssh \
+    progname=ssh targetdir=$(AROS_C) \
+    files="ssh"
 
 %common
