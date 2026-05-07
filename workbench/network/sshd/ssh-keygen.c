@@ -1,13 +1,15 @@
 /*
  * Copyright (C) 2026, The AROS Development Team. All rights reserved.
  *
- * AROS SSH Key Generator using mbedTLS 3.6.6
+ * AROS SSH Key Generator
+ *   - RSA via mbedTLS 3.6.6
+ *   - Ed25519 via libssh 0.12.0
  *
  * Usage: ssh-keygen [-t rsa|ed25519] [-f keyfile]
  *
  * Generates an SSH key pair and saves:
- *   - Private key: ENVARC:SSH/id_rsa (PEM format)
- *   - Public key:  ENVARC:SSH/id_rsa.pub (OpenSSH format)
+ *   - Private key: ENVARC:SSH/id_<type> (PEM format)
+ *   - Public key:  ENVARC:SSH/id_<type>.pub (OpenSSH format)
  */
 
 #include <proto/exec.h>
@@ -22,11 +24,14 @@
 #include <mbedtls/base64.h>
 #include <mbedtls/error.h>
 
+#include <libssh/libssh.h>
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define DEFAULT_KEY_FILE    "ENVARC:SSH/id_rsa"
+#define DEFAULT_RSA_FILE    "ENVARC:SSH/id_rsa"
+#define DEFAULT_ED25519_FILE "ENVARC:SSH/id_ed25519"
 #define CONFIG_DIR          "ENVARC:SSH"
 #define RSA_KEY_BITS        2048
 
@@ -35,8 +40,8 @@ enum key_type {
     KEY_ED25519
 };
 
-/* --- Write OpenSSH public key format --- */
-static BOOL write_pubkey_openssh(mbedtls_pk_context *pk, const char *pubkey_path, enum key_type type)
+/* --- Write OpenSSH public key format (RSA only, via mbedTLS) --- */
+static BOOL write_pubkey_openssh(mbedtls_pk_context *pk, const char *pubkey_path)
 {
     unsigned char der_buf[4096];
     int der_len;
@@ -44,7 +49,6 @@ static BOOL write_pubkey_openssh(mbedtls_pk_context *pk, const char *pubkey_path
     size_t b64_len = 0;
     BPTR fh;
 
-    /* Get public key in DER format */
     der_len = mbedtls_pk_write_pubkey_der(pk, der_buf, sizeof(der_buf));
     if (der_len < 0)
     {
@@ -52,10 +56,8 @@ static BOOL write_pubkey_openssh(mbedtls_pk_context *pk, const char *pubkey_path
         return FALSE;
     }
 
-    /* DER is written at the end of the buffer */
     unsigned char *der_start = der_buf + sizeof(der_buf) - der_len;
 
-    /* Base64 encode */
     if (mbedtls_base64_encode(b64_buf, sizeof(b64_buf), &b64_len, der_start, der_len) != 0)
     {
         Printf("ssh-keygen: Base64 encoding failed\n");
@@ -69,15 +71,13 @@ static BOOL write_pubkey_openssh(mbedtls_pk_context *pk, const char *pubkey_path
         return FALSE;
     }
 
-    /* Write in OpenSSH format: "ssh-rsa BASE64 comment" */
-    const char *type_str = (type == KEY_RSA) ? "ssh-rsa" : "ssh-ed25519";
-    FPrintf(fh, "%s %s aros@aros\n", (IPTR)type_str, (IPTR)b64_buf);
+    FPrintf(fh, "ssh-rsa %s aros@aros\n", (IPTR)b64_buf);
     Close(fh);
 
     return TRUE;
 }
 
-/* --- Generate RSA key pair --- */
+/* --- Generate RSA key pair via mbedTLS --- */
 static int generate_rsa(const char *keyfile)
 {
     mbedtls_pk_context pk;
@@ -144,7 +144,7 @@ static int generate_rsa(const char *keyfile)
     /* Write public key (OpenSSH format) */
     snprintf(pubkey_path, sizeof(pubkey_path), "%s.pub", keyfile);
 
-    if (!write_pubkey_openssh(&pk, pubkey_path, KEY_RSA))
+    if (!write_pubkey_openssh(&pk, pubkey_path))
         goto fail;
 
     Printf("Public key saved to:  %s\n", (IPTR)pubkey_path);
@@ -161,23 +161,58 @@ fail:
     return RETURN_FAIL;
 }
 
-/* --- Generate Ed25519 key pair --- */
+/* --- Generate Ed25519 key pair via libssh --- */
 static int generate_ed25519(const char *keyfile)
 {
-    /*
-     * mbedTLS 3.6.x does not natively support Ed25519 key generation
-     * via the PK layer. We use the low-level PSA crypto API instead.
-     * For now, fall back to RSA with a warning if Ed25519 is unavailable.
-     */
-    Printf("ssh-keygen: Ed25519 support requires PSA Crypto API.\n");
-    Printf("ssh-keygen: Generating RSA key instead. Use libssh for Ed25519 keys.\n");
-    return generate_rsa(keyfile);
+    ssh_key key = NULL;
+    char pubkey_path[256];
+    int rc;
+
+    Printf("Generating Ed25519 key pair...\n");
+
+    rc = ssh_pki_generate(SSH_KEYTYPE_ED25519, 0, &key);
+    if (rc != SSH_OK)
+    {
+        Printf("ssh-keygen: Ed25519 key generation failed\n");
+        return RETURN_FAIL;
+    }
+
+    /* Ensure config directory exists */
+    BPTR lock = CreateDir(CONFIG_DIR);
+    if (lock) UnLock(lock);
+
+    /* Export private key */
+    rc = ssh_pki_export_privkey_file(key, NULL, NULL, NULL, keyfile);
+    if (rc != SSH_OK)
+    {
+        Printf("ssh-keygen: Cannot write private key to '%s'\n", (IPTR)keyfile);
+        ssh_key_free(key);
+        return RETURN_FAIL;
+    }
+
+    Printf("Private key saved to: %s\n", (IPTR)keyfile);
+
+    /* Export public key */
+    snprintf(pubkey_path, sizeof(pubkey_path), "%s.pub", keyfile);
+
+    rc = ssh_pki_export_pubkey_file(key, pubkey_path);
+    if (rc != SSH_OK)
+    {
+        Printf("ssh-keygen: Cannot write public key to '%s'\n", (IPTR)pubkey_path);
+        ssh_key_free(key);
+        return RETURN_FAIL;
+    }
+
+    Printf("Public key saved to:  %s\n", (IPTR)pubkey_path);
+
+    ssh_key_free(key);
+    return RETURN_OK;
 }
 
 /* --- Main --- */
 int main(int argc, char **argv)
 {
-    const char *keyfile = DEFAULT_KEY_FILE;
+    const char *keyfile = NULL;
     enum key_type type = KEY_RSA;
     int i;
 
@@ -208,7 +243,7 @@ int main(int argc, char **argv)
             Printf("Usage: ssh-keygen [-t rsa|ed25519] [-f keyfile]\n\n");
             Printf("Options:\n");
             Printf("  -t type    Key type: rsa (default) or ed25519\n");
-            Printf("  -f file    Output file (default: %s)\n", (IPTR)DEFAULT_KEY_FILE);
+            Printf("  -f file    Output file (default: ENVARC:SSH/id_<type>)\n");
             return RETURN_OK;
         }
         else
@@ -217,6 +252,10 @@ int main(int argc, char **argv)
             return RETURN_WARN;
         }
     }
+
+    /* Default key file based on type */
+    if (!keyfile)
+        keyfile = (type == KEY_ED25519) ? DEFAULT_ED25519_FILE : DEFAULT_RSA_FILE;
 
     /* Check if key already exists */
     BPTR lock = Lock(keyfile, SHARED_LOCK);

@@ -232,103 +232,156 @@ static int auth_password_cb(ssh_session session, const char *user,
     return SSH_AUTH_DENIED;
 }
 
-/* --- Shell session handler --- */
-static void handle_shell(ssh_session session, ssh_channel channel)
+/* --- Shell session context --- */
+struct ShellBridge {
+    ssh_channel channel;
+    BPTR        shell_in;   /* our write end -> shell reads from this pipe */
+    BPTR        shell_out;  /* our read end  <- shell writes to this pipe */
+    int         cols;
+    int         rows;
+};
+
+/* --- Unique pipe name generator --- */
+static ULONG g_pipe_seq = 0;
+
+static void make_pipe_name(char *buf, size_t len, const char *tag)
 {
-    BPTR pipe_r, pipe_w;
-    char pipe_name[64];
+    snprintf(buf, len, "PIPE:sshd_%s_%lx/32768/rw", tag, (unsigned long)++g_pipe_seq);
+}
 
-    /* Create a PIPE: pair for shell I/O */
-    pipe_w = Open("PIPE:sshd_shell/32768", MODE_NEWFILE);
-    if (!pipe_w)
+/* --- Launch shell with pipe I/O --- */
+static BOOL launch_shell(struct ShellBridge *sb)
+{
+    char in_name[64], out_name[64];
+
+    make_pipe_name(in_name, sizeof(in_name), "in");
+    make_pipe_name(out_name, sizeof(out_name), "out");
+
+    /* Open write end of stdin pipe (we write, shell reads) */
+    sb->shell_in = Open(in_name, MODE_NEWFILE);
+    if (!sb->shell_in)
+        return FALSE;
+
+    /* Open read end of stdout pipe (shell writes, we read) */
+    sb->shell_out = Open(out_name, MODE_NEWFILE);
+    if (!sb->shell_out)
     {
-        ssh_channel_write(channel, "Error: cannot create shell pipe\r\n", 33);
-        return;
+        Close(sb->shell_in);
+        sb->shell_in = BNULL;
+        return FALSE;
     }
 
-    if (NameFromFH(pipe_w, pipe_name, sizeof(pipe_name)))
-        pipe_r = Open(pipe_name, MODE_OLDFILE);
-    else
-        pipe_r = BNULL;
+    /* Open the other ends for the shell process */
+    BPTR shell_stdin = Open(in_name, MODE_OLDFILE);
+    BPTR shell_stdout = Open(out_name, MODE_OLDFILE);
 
-    if (!pipe_r)
+    if (!shell_stdin || !shell_stdout)
     {
-        Close(pipe_w);
-        ssh_channel_write(channel, "Error: cannot open shell pipe\r\n", 31);
-        return;
+        if (shell_stdin) Close(shell_stdin);
+        if (shell_stdout) Close(shell_stdout);
+        Close(sb->shell_in);
+        Close(sb->shell_out);
+        sb->shell_in = BNULL;
+        sb->shell_out = BNULL;
+        return FALSE;
     }
 
-    /* Create a second pipe for shell output back to us */
-    BPTR out_w = Open("PIPE:sshd_out/32768", MODE_NEWFILE);
-    BPTR out_r = BNULL;
-    char out_name[64];
-
-    if (out_w && NameFromFH(out_w, out_name, sizeof(out_name)))
-        out_r = Open(out_name, MODE_OLDFILE);
-
-    if (!out_r)
-    {
-        if (out_w) Close(out_w);
-        Close(pipe_r);
-        Close(pipe_w);
-        ssh_channel_write(channel, "Error: cannot create output pipe\r\n", 34);
-        return;
-    }
-
-    /* Launch shell process with pipes as I/O */
-    LONG shell_ret = SystemTags("",
-        SYS_Input,  (IPTR)pipe_r,
-        SYS_Output, (IPTR)out_w,
-        SYS_Asynch, TRUE,
-        SYS_UserShell, TRUE,
-        NP_CloseInput, FALSE,
-        NP_CloseOutput, FALSE,
+    /* Launch C:Shell asynchronously */
+    LONG rc = SystemTags("C:Shell",
+        SYS_Input,      (IPTR)shell_stdin,
+        SYS_Output,     (IPTR)shell_stdout,
+        SYS_Asynch,     TRUE,
+        SYS_UserShell,  TRUE,
+        NP_CloseInput,  TRUE,
+        NP_CloseOutput, TRUE,
         TAG_DONE);
 
-    if (shell_ret == -1)
+    if (rc == -1)
     {
-        Close(pipe_r);
-        Close(pipe_w);
-        Close(out_r);
-        Close(out_w);
+        Close(shell_stdin);
+        Close(shell_stdout);
+        Close(sb->shell_in);
+        Close(sb->shell_out);
+        sb->shell_in = BNULL;
+        sb->shell_out = BNULL;
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/* --- Process window-change requests from channel messages --- */
+static void check_window_change(ssh_session session, struct ShellBridge *sb)
+{
+    ssh_message msg;
+
+    while ((msg = ssh_message_get(session)) != NULL)
+    {
+        if (ssh_message_type(msg) == SSH_REQUEST_CHANNEL &&
+            ssh_message_subtype(msg) == SSH_CHANNEL_REQUEST_WINDOW_CHANGE)
+        {
+            sb->cols = ssh_message_channel_request_pty_width(msg);
+            sb->rows = ssh_message_channel_request_pty_height(msg);
+            ssh_message_channel_request_reply_success(msg);
+        }
+        else
+        {
+            ssh_message_reply_default(msg);
+        }
+        ssh_message_free(msg);
+    }
+}
+
+/* --- Bidirectional shell bridge with PTY emulation --- */
+static void handle_shell(ssh_session session, ssh_channel channel, int cols, int rows)
+{
+    struct ShellBridge sb = {0};
+    sb.channel = channel;
+    sb.cols = cols;
+    sb.rows = rows;
+
+    if (!launch_shell(&sb))
+    {
         ssh_channel_write(channel, "Error: cannot start shell\r\n", 27);
         return;
     }
 
-    /* Bridge loop: SSH channel <-> shell pipes */
     char buf[BUF_SIZE];
     int nbytes;
 
+    /* Main poll loop: bridge SSH channel <-> shell pipes */
     while (ssh_channel_is_open(channel) && !ssh_channel_is_eof(channel))
     {
-        /* Read from shell output (non-blocking) */
-        if (WaitForChar(out_r, 50000)) /* 50ms */
+        /* Shell stdout -> SSH channel (ANSI passthrough, no filtering) */
+        if (WaitForChar(sb.shell_out, 20000)) /* 20ms poll */
         {
-            LONG n = Read(out_r, buf, sizeof(buf));
+            LONG n = Read(sb.shell_out, buf, sizeof(buf));
             if (n > 0)
                 ssh_channel_write(channel, buf, n);
             else if (n < 0)
-                break;
+                break; /* Shell closed its output */
         }
 
-        /* Read from SSH channel (non-blocking) */
+        /* SSH channel -> shell stdin */
         nbytes = ssh_channel_read_nonblocking(channel, buf, sizeof(buf), 0);
         if (nbytes > 0)
         {
-            /* Write to shell stdin */
-            Write(pipe_w, buf, nbytes);
+            Write(sb.shell_in, buf, nbytes);
         }
         else if (nbytes == SSH_ERROR)
             break;
 
-        /* Check for CTRL-C */
+        /* Handle out-of-band channel requests (window-change) */
+        check_window_change(session, &sb);
+
+        /* Check for server CTRL-C shutdown */
         if (SetSignal(0L, SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C)
             break;
     }
 
-    /* Cleanup: close our ends of the pipes */
-    Close(pipe_w);
-    Close(out_r);
+    /* Graceful shutdown: close our pipe ends, which signals EOF to shell */
+    Close(sb.shell_in);
+    Close(sb.shell_out);
 }
 
 /* --- Per-connection session handler --- */
@@ -392,9 +445,10 @@ static void handle_session(ssh_session session)
 
     if (!channel) goto done;
 
-    /* Wait for shell/exec/pty request */
+    /* Wait for shell/exec/pty request, track terminal dimensions */
     BOOL got_shell = FALSE;
     const char *exec_cmd = NULL;
+    int pty_cols = 80, pty_rows = 24;
     timeout = 30;
 
     while (timeout-- > 0 && !got_shell)
@@ -408,6 +462,8 @@ static void handle_session(ssh_session session)
             switch (subtype)
             {
                 case SSH_CHANNEL_REQUEST_PTY:
+                    pty_cols = ssh_message_channel_request_pty_width(msg);
+                    pty_rows = ssh_message_channel_request_pty_height(msg);
                     ssh_message_channel_request_reply_success(msg);
                     break;
                 case SSH_CHANNEL_REQUEST_SHELL:
@@ -436,24 +492,22 @@ static void handle_session(ssh_session session)
     if (exec_cmd)
     {
         /* Single command execution */
-        BPTR out_w = Open("PIPE:sshd_exec/32768", MODE_NEWFILE);
-        BPTR out_r = BNULL;
         char out_name[64];
+        make_pipe_name(out_name, sizeof(out_name), "exec");
 
-        if (out_w && NameFromFH(out_w, out_name, sizeof(out_name)))
-            out_r = Open(out_name, MODE_OLDFILE);
+        BPTR out_w = Open(out_name, MODE_NEWFILE);
+        BPTR out_r = Open(out_name, MODE_OLDFILE);
 
-        if (out_r)
+        if (out_w && out_r)
         {
             BPTR nil_in = Open("NIL:", MODE_OLDFILE);
             LONG rc = SystemTags(exec_cmd,
-                SYS_Input,  (IPTR)nil_in,
-                SYS_Output, (IPTR)out_w,
-                NP_CloseInput, TRUE,
+                SYS_Input,      (IPTR)nil_in,
+                SYS_Output,     (IPTR)out_w,
+                NP_CloseInput,  TRUE,
                 NP_CloseOutput, TRUE,
                 TAG_DONE);
 
-            /* Read all output */
             char buf[BUF_SIZE];
             LONG n;
             while ((n = Read(out_r, buf, sizeof(buf))) > 0)
@@ -465,13 +519,14 @@ static void handle_session(ssh_session session)
         else
         {
             if (out_w) Close(out_w);
+            if (out_r) Close(out_r);
             ssh_channel_write(channel, "Error: cannot execute command\r\n", 30);
         }
     }
     else
     {
-        /* Interactive shell */
-        handle_shell(session, channel);
+        /* Interactive shell with PTY bridge */
+        handle_shell(session, channel, pty_cols, pty_rows);
     }
 
 cleanup_channel:
