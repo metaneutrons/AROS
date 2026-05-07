@@ -249,9 +249,10 @@ STATIC BOOL ReadARGB35(struct DiskObject *icon, struct IFFHandle *iff, struct Fi
     argb = AllocMemIcon(icon, size, MEMF_PUBLIC, IconBase);
     if (!argb) goto fail;
  
-    zsize = (UWORD)AROS_BE2WORD(*((UWORD *)(src + 6)));
-    if (zsize + 10 > (ULONG)chunksize)
-        zsize = chunksize - 10;
+    zsize = (UWORD)AROS_BE2WORD(*((UWORD *)(src + 6))) + 1;
+    if (chunksize < 10 || zsize + 10 > (ULONG)chunksize)
+        zsize = (chunksize > 10) ? (ULONG)chunksize - 10 : 0;
+    if (zsize == 0) goto fail;
     err = uncompress(argb, &size, src + 10, zsize);
     if (err != Z_OK) {
         D(bug("%s: Can't uncompress %d ARGB bytes: %s\n", __func__, zsize, zError(err)));
