@@ -95,32 +95,40 @@ ssh-keygen -t rsa -f SYS:mykey       ; Custom output path
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐
-│   ssh (C:)  │     │  sshd (C:)   │
-└──────┬──────┘     └──────┬───────┘
-       │                   │
-       ▼                   ▼
-┌──────────────────────────────────┐
-│         libssh 0.12.0            │
-│   (session, channel, auth, scp)  │
-└──────────────┬───────────────────┘
-               │
-               ▼
-┌──────────────────────────────────┐
-│        mbedTLS 3.6.6             │
-│  (TLS, RSA, ECDH, SHA-256, AES) │
-└──────────────┬───────────────────┘
-               │
-               ▼
-┌──────────────────────────────────┐
-│      bsdsocket.library           │
-│    (TCP/IP via AROSTCP)          │
-└──────────────────────────────────┘
++-------------+     +--------------+     +--------------+
+|   ssh (C:)  |     |  sshd (C:)   |     | ssh-keygen   |
++------+------+     +------+-------+     +------+-------+
+       |                   |                     |
+       v                   v                     v
++------------------------------------------------------+
+|                   libssh 0.12.0                      |
+|        (session, channel, auth, scp, ed25519)        |
++----------------------------+-------------------------+
+                             |
+                             v
++------------------------------------------------------+
+|                   mbedTLS 3.6.6                      |
+|          (TLS, RSA, ECDH, SHA-256, AES)              |
++----------------------------+-------------------------+
+                             |
+                             v
++------------------------------------------------------+
+|                bsdsocket.library                     |
+|                (TCP/IP via AROSTCP)                   |
++------------------------------------------------------+
+
+sshd shell session:
+
++----------+    PIPE:ssh_in_N     +----------+
+| SSH      | ------------------->  | C:Shell  |
+| Channel  |    PIPE:ssh_out_N    |          |
+|          | <-------------------  |          |
++----------+                      +----------+
 ```
 
 ## Security Notes
 
-- Host key is RSA 2048-bit, auto-generated on first `sshd` run
+- Host key: RSA 2048 or Ed25519, auto-generated on first `sshd` run
 - Password stored as SHA-256 hash, never plaintext
 - Known hosts verified by SHA-256 fingerprint
 - No root/privilege escalation (AROS has no privilege levels)
@@ -139,3 +147,4 @@ Requires: `workbench-libs-libssh` and `workbench-libs-mbedtls` built first.
 - No SSH agent forwarding
 - No X11 forwarding
 - No port forwarding / tunneling
+- No SFTP subsystem (use SCP for file transfer)
