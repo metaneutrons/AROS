@@ -807,33 +807,36 @@ ULONG FNAME_SDCBUS(FinishData)(struct TagItem *DataTags, struct sdcard_Bus *bus)
          * directly to/from the target buffer without CPU involvement.
          */
         BOOL useDMA = FALSE;
+        volatile ULONG *adma_desc = NULL;
         if ((bus->sdcb_Capabilities & SDHCI_CAN_DO_ADMA2) &&
             (((IPTR)sdData & 3) == 0) && (sdDataLen >= 4))
         {
-            /* ADMA2 descriptor: 64-bit address mode (8 bytes per entry) */
-            ULONG adma_buf[8] __attribute__((aligned(32)));
-            volatile ULONG *adma_desc = (volatile ULONG *)adma_buf;
-            adma_desc[0] = (0x21 | (sdDataLen << 16));  /* Valid + End + Act=Tran + Length */
-            adma_desc[1] = 0;                            /* Attr high (unused in 32-bit) */
-            adma_desc[2] = (ULONG)(IPTR)sdData;          /* Address low */
-            adma_desc[3] = 0;                            /* Address high */
+            /* Allocate DMA-safe descriptor (physical <2GB, cache-coherent) */
+            adma_desc = (volatile ULONG *)AllocMem(32, MEMF_PUBLIC | MEMF_CLEAR | MEMF_31BIT);
+            if (adma_desc)
+            {
+                adma_desc[0] = (0x21 | (sdDataLen << 16));  /* Valid + End + Act=Tran + Length */
+                adma_desc[1] = 0;                            /* Attr high (unused in 32-bit) */
+                adma_desc[2] = (ULONG)(IPTR)sdData;          /* Address low */
+                adma_desc[3] = 0;                            /* Address high */
 
-            __asm__ volatile("dsb sy" ::: "memory");
+                CacheClearE((APTR)adma_desc, 32, CACRF_ClearD);
 
-            /* Set ADMA2 mode in Host Control */
-            UBYTE hctrl = bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, bus);
-            hctrl &= ~SDHCI_HCTRL_DMA_MASK;
-            hctrl |= SDHCI_HCTRL_ADMA32;
-            bus->sdcb_IOWriteByte(SDHCI_HOST_CONTROL, hctrl, bus);
+                /* Set ADMA2 mode in Host Control */
+                UBYTE hctrl = bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, bus);
+                hctrl &= ~SDHCI_HCTRL_DMA_MASK;
+                hctrl |= SDHCI_HCTRL_ADMA32;
+                bus->sdcb_IOWriteByte(SDHCI_HOST_CONTROL, hctrl, bus);
 
-            /* Write descriptor address */
-            bus->sdcb_IOWriteLong(SDHCI_ADMA_ADDRESS, (ULONG)(IPTR)adma_desc, bus);
+                /* Write descriptor address */
+                bus->sdcb_IOWriteLong(SDHCI_ADMA_ADDRESS, (ULONG)(IPTR)adma_desc, bus);
 
-            useDMA = TRUE;
-            DTRANS(bug("[SDBus%02u] %s: ADMA2 %s %d bytes @ %p\n",
-                       bus->sdcb_BusNum, __PRETTY_FUNCTION__,
-                       (sdDataMode == MMC_DATA_READ) ? "read" : "write",
-                       sdDataLen, (void *)sdData));
+                useDMA = TRUE;
+                DTRANS(bug("[SDBus%02u] %s: ADMA2 %s %d bytes @ %p\n",
+                           bus->sdcb_BusNum, __PRETTY_FUNCTION__,
+                           (sdDataMode == MMC_DATA_READ) ? "read" : "write",
+                           sdDataLen, (void *)sdData));
+            }
         }
 
         if (useDMA)
@@ -867,6 +870,8 @@ ULONG FNAME_SDCBUS(FinishData)(struct TagItem *DataTags, struct sdcard_Bus *bus)
             /* Clear DMA interrupt */
             bus->sdcb_IOWriteLong(SDHCI_INT_STATUS, SDHCI_INT_DMA_END | SDHCI_INT_DATA_END, bus);
             sdDataLen = 0;
+            if (adma_desc)
+                FreeMem((APTR)adma_desc, 32);
         }
         else
         {

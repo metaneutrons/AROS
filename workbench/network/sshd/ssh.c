@@ -109,6 +109,8 @@ static int verify_known_host(ssh_session session)
             ssh_clean_pubkey_hash(&hash);
             return 0;
         }
+
+        ssh_string_free_char(host);
     }
 
     /* Host not found - prompt user */

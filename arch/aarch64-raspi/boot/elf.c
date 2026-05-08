@@ -144,16 +144,18 @@ static struct bss_tracker *bss_tracker = &tracker[0];
 static int load_hunk(void *file, struct sheader *sh)
 {
     void *ptr = (void *)0;
+    uint64_t align = sh->addralign;
+    if (align == 0) align = 1;
     if (!sh->size) return 1;
     if (sh->flags & SHF_WRITE)
     {
-        ptr_rw = (ptr_rw + sh->addralign - 1) & ~(sh->addralign - 1);
+        ptr_rw = (ptr_rw + align - 1) & ~(align - 1);
         ptr = (void *)ptr_rw;
         ptr_rw += sh->size;
     }
     else
     {
-        ptr_ro = (ptr_ro + sh->addralign - 1) & ~(sh->addralign - 1);
+        ptr_ro = (ptr_ro + align - 1) & ~(align - 1);
         ptr = (void *)ptr_ro;
         ptr_ro += sh->size;
     }
@@ -234,13 +236,23 @@ static int relocate(struct elfheader *eh, struct sheader *sh, long shrel_idx,
         {
         case R_AARCH64_ABS64:
             if (is_exec)
-                put_u64_unaligned((void *)p_addr, get_u64_unaligned((void *)p_addr) + (uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
+            {
+                if (sym->shindex >= int_shnum)
+                    put_u64_unaligned((void *)p_addr, get_u64_unaligned((void *)p_addr) + voff);
+                else
+                    put_u64_unaligned((void *)p_addr, get_u64_unaligned((void *)p_addr) + (uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
+            }
             else
                 put_u64_unaligned((void *)p_addr, s + voff);
             break;
         case R_AARCH64_ABS32:
             if (is_exec)
-                *(uint32_t *)p_addr += (uint32_t)((uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
+            {
+                if (sym->shindex >= int_shnum)
+                    *(uint32_t *)p_addr += (uint32_t)(voff);
+                else
+                    *(uint32_t *)p_addr += (uint32_t)((uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
+            }
             else
                 *(uint32_t *)p_addr = (uint32_t)(s + voff);
             break;

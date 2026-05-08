@@ -228,7 +228,7 @@ int genet_HW_Send(struct GENETUnit *unit, UBYTE *data, ULONG length)
 
     /* Advance producer index */
     unit->gn_TxProdIdx++;
-    genet_wr(unit, TDMA_PROD_INDEX, unit->gn_TxProdIdx);
+    genet_wr(unit, TDMA_PROD_INDEX, unit->gn_TxProdIdx & 0xFFFF);
 
     /* Wait for completion */
     do {
