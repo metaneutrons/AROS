@@ -428,7 +428,7 @@ void FNAME_DEV(ScheduleCtrlTDs)(struct USB2OTGUnit *otg_Unit)
         if (otg_Unit->hu_Channel[CHAN_CTRL].hc_Request == NULL) {
             otg_Unit->hu_Channel[CHAN_CTRL].hc_Request = req;
         } else {
-            ADDHEAD(&otg_Unit, req);
+            ADDHEAD(&otg_Unit->hu_CtrlXFerQueue, req);
             Enable();
             return;
         }

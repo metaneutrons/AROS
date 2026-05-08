@@ -97,15 +97,16 @@ struct drm_gem_close {
  */
 #define MAX_BO_HANDLES 256
 static struct V3DBO *bo_table[MAX_BO_HANDLES];
-static ULONG next_handle = 1;
 
 static ULONG alloc_handle(struct V3DBO *bo)
 {
-    ULONG h = next_handle++;
-    if (h >= MAX_BO_HANDLES)
-        return 0;
-    bo_table[h] = bo;
-    return h;
+    for (ULONG h = 1; h < MAX_BO_HANDLES; h++) {
+        if (bo_table[h] == NULL) {
+            bo_table[h] = bo;
+            return h;
+        }
+    }
+    return 0;
 }
 
 static struct V3DBO *lookup_handle(ULONG handle)
@@ -137,6 +138,10 @@ int v3d_ioctl_aros(struct V3DData *sd, unsigned long request, void *arg)
         if (!bo)
             return -1;
         create->handle = alloc_handle(bo);
+        if (!create->handle) {
+            v3d_aros_bo_free(sd, bo);
+            return -1;
+        }
         create->offset = bo->paddr;
         return 0;
     }

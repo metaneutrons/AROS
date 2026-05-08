@@ -82,10 +82,15 @@ char *dlerror(void) { return "not supported"; }
 int getpagesize(void) { return 4096; }
 long sysconf(int n) { (void)n; return 4096; }
 int posix_memalign(void **ptr, size_t align, size_t size) {
-    void *p = malloc(size + align);
-    if (!p) return -1;
-    *ptr = (void *)(((uintptr_t)p + align - 1) & ~(align - 1));
+    void *raw = malloc(size + align + sizeof(void *));
+    if (!raw) return -1;
+    uintptr_t aligned = ((uintptr_t)raw + sizeof(void *) + align - 1) & ~(align - 1);
+    ((void **)aligned)[-1] = raw;
+    *ptr = (void *)aligned;
     return 0;
+}
+void aligned_free(void *ptr) {
+    if (ptr) free(((void **)ptr)[-1]);
 }
 unsigned int sleep(unsigned int s) { (void)s; return 0; }
 int usleep(unsigned int u) { (void)u; return 0; }

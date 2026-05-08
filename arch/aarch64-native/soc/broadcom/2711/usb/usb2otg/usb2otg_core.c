@@ -64,7 +64,7 @@ struct Unit * FNAME_DEV(OpenUnit)(struct IOUsbHWReq *ioreq,
             *((volatile unsigned int *)USB2OTG_DEVCTRL) = (1 << 10) | (1 << 8);
 #endif
             otg_RegVal = rd32le(USB2OTG_HARDWARE2);
-            if (((otg_RegVal & (3 << 6) >> 6) == 2) && ((otg_RegVal & (3 << 8) >> 8) == 1))
+            if ((((otg_RegVal & (3 << 6)) >> 6) == 2) && (((otg_RegVal & (3 << 8)) >> 8) == 1))
             {
                 otg_RegVal = rd32le(USB2OTG_USB);
                 if (otg_RegVal & USB2OTG_USB_ULPIFSLS)

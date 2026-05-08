@@ -97,8 +97,8 @@ void METHOD(I2CBCM2711, Hidd_I2C, WriteRead)
  */
 static int I2CBCM2711_Init(LIBBASETYPEPTR LIBBASE)
 {
-    IPTR peribase = KrnGetSystemAttr(KATTR_PeripheralBase);
-    IPTR gpio_base = peribase + GPIO_OFFSET;
+    IPTR gpio_base;
+    IPTR peribase;
     ULONG tmp;
 
     D(bug("[I2C] BCM2711 I2C Init\n"));
@@ -106,6 +106,9 @@ static int I2CBCM2711_Init(LIBBASETYPEPTR LIBBASE)
     KernelBase = OpenResource("kernel.resource");
     if (!KernelBase)
         return FALSE;
+
+    peribase = KrnGetSystemAttr(KATTR_PeripheralBase);
+    gpio_base = peribase + GPIO_OFFSET;
 
     LIBBASE->i2c_RegBase = peribase + BSC1_OFFSET;
 

@@ -72,6 +72,13 @@ AROS_SLIB_ENTRY(StackSwap,Exec,122):
     /* Swap stack pointers */
     mov     x3, sp
     ldr     x4, [x19, stk_Pointer]
+
+    /* Copy saved frame (x29/x30/x19) from old stack to new stack */
+    ldp     x5, x6, [x3, #16]     /* x5 = x29, x6 = x30 from old frame */
+    ldr     x7, [x3, #32]         /* x7 = x19 from old frame */
+    stp     x5, x6, [x4, #16]     /* store x29, x30 to new stack */
+    str     x7, [x4, #32]         /* store x19 to new stack */
+
     mov     sp, x4
     str     x3, [x19, stk_Pointer]
 

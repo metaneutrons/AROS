@@ -252,7 +252,7 @@ static int FNAME_DEV(Init)(LIBBASETYPEPTR USB2OTGBase)
 #endif
 
                                     otg_RegVal = rd32le(USB2OTG_HARDWARE2);
-                                    if (((otg_RegVal & (3 << 6) >> 6) == 2) && ((otg_RegVal & (3 << 8) >> 8) == 1))
+                                    if ((((otg_RegVal & (3 << 6)) >> 6) == 2) && (((otg_RegVal & (3 << 8)) >> 8) == 1))
                                     {
                                         D(bug("[USB2OTG] %s: ULPI FSLS configuration: enabled.\n", __PRETTY_FUNCTION__));
                                         otg_RegVal = rd32le(USB2OTG_USB);
