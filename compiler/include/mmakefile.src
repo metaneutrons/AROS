@@ -23,6 +23,7 @@ INCSUBDIRS :=	aros				\
 		bluetooth			\
 		c++				\
 		c++/exec			\
+		classes	                        \
 		clib				\
 		datatypes			\
 		defines			        \
@@ -39,6 +40,7 @@ INCSUBDIRS :=	aros				\
 		hardware/pic			\
 		hardware/usb			\
 		hidd				\
+		images				\
 		inline			        \
 		intuition			\
 		irda				\
@@ -48,6 +50,7 @@ INCSUBDIRS :=	aros				\
 		pragmas				\
 		prefs				\
 		proto				\
+		reaction			\
 		resources			\
 		rexx				\
 		SDI				\
