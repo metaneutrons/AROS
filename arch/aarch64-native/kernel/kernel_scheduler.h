@@ -2,6 +2,7 @@
 #define KERNEL_SCHEDULER_H
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: Per-CPU scheduler data for AArch64 SMP.
           Modeled after arch/all-pc/kernel/kernel_scheduler.h.

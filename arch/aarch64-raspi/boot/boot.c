@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: AArch64 bootstrap for Raspberry Pi 4.
           Parses device tree, detects memory, sets up MMU,

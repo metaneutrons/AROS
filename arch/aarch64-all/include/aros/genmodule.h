@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2016-2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: genmodule.h include file for aarch64-le systems
 */

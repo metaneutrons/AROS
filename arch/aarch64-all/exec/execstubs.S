@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: Stubs to call C functions while preserving all registers, AArch64 version
     Lang: english

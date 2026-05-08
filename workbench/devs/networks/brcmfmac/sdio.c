@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM43455 WiFi — SDIO transport layer
  *
  * Implements CMD52 (single-byte) and CMD53 (multi-byte) SDIO I/O

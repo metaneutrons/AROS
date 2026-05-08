@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: StackSwap() - Swap the stack of a task, AArch64 version.
     Lang: english

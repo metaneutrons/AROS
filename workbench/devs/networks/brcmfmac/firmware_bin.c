@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
 /* BCM43455 firmware - auto-generated, do not edit */
 /* Source: linux-firmware brcm/brcmfmac43455-sdio.bin */
 /* License: Broadcom/Cypress proprietary */

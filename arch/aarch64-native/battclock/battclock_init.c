@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * battclock.resource for Raspberry Pi 4 — DS3231 RTC via I2C
  *
  * Reads/writes time from a DS3231 or compatible I2C RTC module

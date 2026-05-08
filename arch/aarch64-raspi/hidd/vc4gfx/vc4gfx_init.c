@@ -1,4 +1,5 @@
 /*
+ * Author: Fabian Schmieder
     Copyright (C) 2013-2017, The AROS Development Team. All rights reserved.
 
     Desc: BCM VideoCore4 Gfx Hidd initialisation code

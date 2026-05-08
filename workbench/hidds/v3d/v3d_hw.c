@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * VideoCore VI (V3D 4.2) GPU — Hardware initialization and job submission
  *
  * Based on Linux drivers/gpu/drm/v3d/ and Mesa src/gallium/drivers/v3d/

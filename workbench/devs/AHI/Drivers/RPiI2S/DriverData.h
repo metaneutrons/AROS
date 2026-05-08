@@ -1,3 +1,4 @@
+/* Copyright (C) 2026, The AROS Development Team. Author: Fabian Schmieder */
 #ifndef AHI_Drivers_RPiI2S_DriverData_h
 #define AHI_Drivers_RPiI2S_DriverData_h
 #include <exec/libraries.h>

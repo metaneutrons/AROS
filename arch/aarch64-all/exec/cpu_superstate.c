@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: cpu_SuperState() — AArch64 version.
           On AArch64 native, we always run in EL1 (supervisor).

@@ -1,4 +1,5 @@
 /*
+ * Author: Fabian Schmieder
     Copyright (C) 2013-2020, The AROS Development Team. All rights reserved.
 */
 

@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: VideoCore mailbox framebuffer + boot console for BCM2711.
           Ported from arch/arm-raspi/boot/vc_fb.c, vc_mb.c, bc/screen_fb.c.

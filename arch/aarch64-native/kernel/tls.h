@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: Thread-Local Storage for AArch64 kernel.
           Uses TPIDR_EL1 (kernel-only TLS register).

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
 #include <aros/macros.h>
 #include "devicetree.h"
 #include "boot.h"

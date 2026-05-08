@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: exec_platform.h for AArch64 native.
           TLS accessed via TPIDR_EL1 system register.

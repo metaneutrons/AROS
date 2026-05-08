@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM2711 PCIe Root Complex — PCI HIDD Driver Class
  *
  * Provides config space read/write for the BCM2711 PCIe controller

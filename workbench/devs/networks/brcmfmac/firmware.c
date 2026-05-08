@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM43455 WiFi — Firmware upload
  *
  * Uploads the embedded brcmfmac43455-sdio firmware to the chip's

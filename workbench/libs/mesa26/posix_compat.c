@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
 #include <sys/time.h>
 /*
  * POSIX compatibility for Mesa 26 on AROS — all implementations

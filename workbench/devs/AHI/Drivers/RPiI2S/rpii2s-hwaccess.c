@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
 #include <config.h>
 #include <exec/types.h>
 #include <aros/macros.h>

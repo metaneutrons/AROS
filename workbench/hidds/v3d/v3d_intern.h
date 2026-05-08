@@ -1,4 +1,5 @@
 #ifndef V3D_INTERN_H
+ * Author: Fabian Schmieder
 #define V3D_INTERN_H
 
 #include <exec/types.h>

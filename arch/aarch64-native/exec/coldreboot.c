@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: ColdReboot() - Reboot via BCM2711 Power Management Watchdog.
 */

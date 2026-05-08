@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
 #include <config.h>
 #include <proto/dos.h>
 #include <proto/exec.h>

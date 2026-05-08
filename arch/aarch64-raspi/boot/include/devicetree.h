@@ -1,3 +1,4 @@
+/* Copyright (C) 2026, The AROS Development Team. Author: Fabian Schmieder */
 #ifndef _DEVICETREE_H
 #define _DEVICETREE_H
 

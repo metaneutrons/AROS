@@ -1,3 +1,4 @@
+/* Copyright (C) 2026, The AROS Development Team. Author: Fabian Schmieder */
 #ifndef MEMCHECK_H
 #define MEMCHECK_H
 #define VALGRIND_MAKE_MEM_DEFINED(a,b)

@@ -1,4 +1,5 @@
 /* DRM stub for AROS — V3D uses v3d_ioctl_aros() instead */
+ * Author: Fabian Schmieder
 #ifndef XF86DRM_H
 #define XF86DRM_H
 

@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * V3D DRM ioctl shim for AROS
  *
  * Replaces Linux DRM ioctls with direct hardware access via our

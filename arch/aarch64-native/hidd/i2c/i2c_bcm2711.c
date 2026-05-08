@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM2711 I2C (BSC1) HIDD driver for Raspberry Pi 4
  *
  * Provides Hidd_I2C interface for the BSC1 controller

@@ -1,4 +1,5 @@
 /*
+ * Author: Fabian Schmieder
  * Calibrated microsecond delay using ARM Generic Timer (CNTPCT_EL0).
  *
  * The Generic Timer runs at a fixed frequency (typically 54MHz on BCM2711/2712).

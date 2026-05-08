@@ -1,4 +1,5 @@
 #ifndef BATTCLOCK_INTERN_H
+ * Author: Fabian Schmieder
 #define BATTCLOCK_INTERN_H
 
 #include <exec/types.h>

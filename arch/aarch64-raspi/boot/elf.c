@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
     Desc: ELF64 loader for AArch64 bootstrap.
           Loads core.elf into high memory, performs RELA relocations.
           Based on arch/arm-raspi/boot/elf.c, adapted for ELF64/AArch64.

@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: AArch64 platform probe framework.
           Iterates registered platform probes to find matching SoC.

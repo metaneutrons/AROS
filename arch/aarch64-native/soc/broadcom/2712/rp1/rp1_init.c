@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * RP1 Southbridge driver for Raspberry Pi 5
  *
  * Discovers RP1 via direct PCIe ECAM config space read (bus 1, dev 0).

@@ -1,4 +1,5 @@
 /* DRM fourcc stub for AROS */
+ * Author: Fabian Schmieder
 #ifndef DRM_FOURCC_H
 #define DRM_FOURCC_H
 #include <stdint.h>

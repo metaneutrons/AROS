@@ -1,4 +1,5 @@
 #ifndef DWMAC_H
+ * Author: Fabian Schmieder
 #define DWMAC_H
 
 #include <exec/types.h>

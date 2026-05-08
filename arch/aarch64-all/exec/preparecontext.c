@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: PrepareContext() - Prepare a task context for dispatch, AArch64 version.
 

@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2013-2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: VideoCore mailbox resource for BCM2711 (AArch64).
           Ported from arch/arm-native/soc/broadcom/2708/mbox/mbox_init.c.

@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
     Desc: KrnSwitch — save current task context and dispatch next, AArch64.
 */
 

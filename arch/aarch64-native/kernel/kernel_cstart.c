@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: AArch64 kernel startup — parse boot tags, set up memory, create ExecBase.
           Ported from arch/arm-native/kernel/kernel_startup.c.

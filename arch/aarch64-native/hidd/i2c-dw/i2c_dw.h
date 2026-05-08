@@ -1,4 +1,5 @@
 /*
+ * Author: Fabian Schmieder
  * Synopsys DesignWare I2C HIDD for RP1 (Raspberry Pi 5)
  *
  * Register definitions from Linux drivers/i2c/busses/i2c-designware-core.h

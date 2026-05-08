@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM43455 WiFi — FullMAC command interface
  *
  * Sends ioctl commands to the firmware and processes events/responses.

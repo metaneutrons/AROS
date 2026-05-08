@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM2711 GENET Ethernet — SANA-II Device handler (BeginIO/AbortIO)
  */
 

@@ -1,4 +1,5 @@
 /* Valgrind stub for AROS */
+ * Author: Fabian Schmieder
 #ifndef VALGRIND_H
 #define VALGRIND_H
 #define VG_USERREQ_TOOL_BASE(a,b) 0

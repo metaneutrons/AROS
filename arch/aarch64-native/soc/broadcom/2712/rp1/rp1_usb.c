@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * RP1 USB 3.0 (xHCI) platform initialization for Raspberry Pi 5
  *
  * Creates PCIController structs with hc_RegBase pre-set to the RP1

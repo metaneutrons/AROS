@@ -1,4 +1,5 @@
 #ifndef RP1_H
+ * Author: Fabian Schmieder
 #define RP1_H
 
 #include <exec/types.h>

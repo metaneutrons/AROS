@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * VideoCore VI (V3D) — Gallium HIDD class (Phase 3: full integration)
  *
  * Provides the Gallium pipe_screen via Mesa's V3D driver.

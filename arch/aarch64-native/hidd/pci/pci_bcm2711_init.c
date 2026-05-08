@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM2711 PCIe Root Complex — Initialization
  *
  * Performs the hardware bring-up sequence for the BCM2711 PCIe RC:

@@ -1,4 +1,5 @@
 #ifndef RPII2S_HWACCESS_H
+ * Author: Fabian Schmieder
 #define RPII2S_HWACCESS_H
 #include <exec/types.h>
 #include <aros/macros.h>

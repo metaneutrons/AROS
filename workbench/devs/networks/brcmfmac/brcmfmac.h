@@ -1,4 +1,5 @@
 #ifndef BRCMFMAC_H
+ * Author: Fabian Schmieder
 #define BRCMFMAC_H
 
 #include <exec/types.h>

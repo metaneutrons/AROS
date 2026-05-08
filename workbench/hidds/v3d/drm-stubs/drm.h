@@ -1,4 +1,5 @@
 /* DRM base stub for AROS */
+ * Author: Fabian Schmieder
 #ifndef DRM_H
 #define DRM_H
 #include <stdint.h>

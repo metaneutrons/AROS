@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM2711 RNG200 Hardware Random Number Generator
  *
  * Provides a single function RNGRead() that returns a 32-bit

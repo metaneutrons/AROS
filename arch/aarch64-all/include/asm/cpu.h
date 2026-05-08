@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
 
     Desc: AArch64 memory barrier macros.
           Compatible with arch/arm-all/include/asm/cpu.h API.

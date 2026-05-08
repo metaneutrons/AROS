@@ -1,3 +1,4 @@
+/* Copyright (C) 2026, The AROS Development Team. Author: Fabian Schmieder */
 #include <config.h>
 #include <devices/ahi.h>
 #include <dos/dostags.h>

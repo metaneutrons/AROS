@@ -1,4 +1,5 @@
 /*
+ * Author: Fabian Schmieder
  * BCM2711 GENET Ethernet — Hardware access
  *
  * Based on U-Boot drivers/net/bcmgenet.c

@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026, The AROS Development Team. All rights reserved.
+ * Author: Fabian Schmieder
+ */
+/*
  * BCM2711 GENET Ethernet — MDIO/PHY access
  *
  * BCM54213PE PHY connected via internal MDIO at address 1.

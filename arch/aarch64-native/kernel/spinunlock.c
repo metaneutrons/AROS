@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
+     Author: Fabian Schmieder
     Desc: KrnSpinUnLock for AArch64 — release spinlock with store-release.
 */
 

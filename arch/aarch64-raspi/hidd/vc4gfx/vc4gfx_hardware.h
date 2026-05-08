@@ -1,3 +1,4 @@
+/* Copyright (C) 2026, The AROS Development Team. Author: Fabian Schmieder */
 #ifndef _VIDEOCOREGFX_HARDWARE_H
 #define _VIDEOCOREGFX_HARDWARE_H
 
