@@ -124,7 +124,7 @@ ULONG FNAME_SDCUNIT(MMCChangeFrequency)(struct sdcard_Unit *sdcUnit)
     }
 
     /* Fallback: standard High-Speed (26/52 MHz) */
-    if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_HS_TIMING, EXT_CSD_HS_TIMING_HS, sdcUnit) != -1)
+    if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_HS_TIMING, EXT_CSD_HS_TIMING_HS, sdcUnit) == -1)
     {
         D(bug("[SDCard%02ld] %s: HS switch failed\n", sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
         return -1;

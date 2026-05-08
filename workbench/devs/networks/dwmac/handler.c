@@ -109,6 +109,10 @@ AROS_LH1(void, BeginIO,
                 r->ios2_Req.io_Error = IOERR_ABORTED;
                 ReplyMsg((struct Message *)r);
             }
+            while ((r = (struct IOSana2Req *)RemHead((struct List *)&unit->du_WriteList))) {
+                r->ios2_Req.io_Error = IOERR_ABORTED;
+                ReplyMsg((struct Message *)r);
+            }
         }
         ReleaseSemaphore(&unit->du_Lock);
         break;

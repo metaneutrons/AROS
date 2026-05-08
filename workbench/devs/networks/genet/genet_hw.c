@@ -233,7 +233,7 @@ int genet_HW_Send(struct GENETUnit *unit, UBYTE *data, ULONG length)
     /* Wait for completion */
     do {
         cons = genet_rd(unit, TDMA_CONS_INDEX) & 0xFFFF;
-    } while (cons < unit->gn_TxProdIdx && --tries);
+    } while (cons != (unit->gn_TxProdIdx & 0xFFFF) && --tries);
 
     if (!tries)
         return -1;

@@ -107,7 +107,6 @@ int getElfSize(void *elf_file, uint64_t *size_rw, uint64_t *size_ro)
          * Each R_AARCH64_ADR_GOT_PAGE relocation needs an 8-byte GOT entry.
          */
         uint64_t got_size = 0;
-        if (!checkHeader(eh))
         {
             struct sheader *sh = (struct sheader *)((uintptr_t)elf_file + eh->shoff);
             for (unsigned i = 0; i < int_shnum; i++)
@@ -367,7 +366,8 @@ uintptr_t loadElf(void *elf_file)
     {
         struct sheader *sh = (struct sheader *)((uintptr_t)elf_file + eh->shoff);
         uintptr_t deltas[int_shnum];
-        
+        memset(deltas, 0, sizeof(IPTR) * int_shnum);
+
         for (unsigned i = 0; i < int_shnum; i++)
         {
             if (sh[i].type == SHT_SYMTAB || sh[i].type == SHT_STRTAB)

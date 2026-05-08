@@ -28,8 +28,7 @@
 #define AROS_NO_ATOMIC_OPERATIONS
 #include "exec_platform.h"
 
-/* Per-CPU: last task that used the FPU (owns current HW FPU state) */
-static struct Task *fpu_owner;
+/* Per-CPU FPU owner is stored in TLS as FPUOwner */
 
 /*
  * fpu_save — save FPU/NEON registers to task's VFPContext.
@@ -124,9 +123,10 @@ void fpu_trap_handler(void)
     if (!task) return;
 
     /* Save previous owner's FPU state */
-    if (fpu_owner && fpu_owner != task)
+    struct Task *owner = TLS_GET(FPUOwner);
+    if (owner && owner != task)
     {
-        struct ExceptionContext *octx = fpu_owner->tc_UnionETask.tc_ETask->et_RegFrame;
+        struct ExceptionContext *octx = owner->tc_UnionETask.tc_ETask->et_RegFrame;
         if (octx && octx->fpuContext)
         {
             fpu_save((struct VFPContext *)octx->fpuContext);
@@ -142,7 +142,7 @@ void fpu_trap_handler(void)
             fpu_restore((struct VFPContext *)ctx->fpuContext);
     }
 
-    fpu_owner = task;
+    TLS_SET(FPUOwner, task);
     fpu_enable();
 }
 
@@ -247,7 +247,7 @@ void cpu_Dispatch(regs_t *regs)
      * and restore this task's state on demand.
      * Skip if this task already owns the FPU (common case: same task re-dispatched).
      */
-    if (task != fpu_owner)
+    if (task != TLS_GET(FPUOwner))
         fpu_disable();
 }
 

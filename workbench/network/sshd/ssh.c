@@ -104,6 +104,7 @@ static int verify_known_host(ssh_session session)
 
         if (found)
         {
+            ssh_string_free_char(host);
             ssh_string_free_char(hexa);
             ssh_clean_pubkey_hash(&hash);
             return 0;

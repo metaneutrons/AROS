@@ -43,7 +43,8 @@ static ULONG pcie_cfg_read(ULONG bus, ULONG dev, ULONG func, ULONG reg)
 
 static int RP1_Init(LIBBASETYPEPTR LIBBASE)
 {
-    ULONG id, bar1;
+    ULONG id;
+    IPTR bar1;
     UWORD vendor, device;
 
     D(bug("[RP1] Init — probing PCIe bus 1 for RP1\n"));
@@ -59,7 +60,7 @@ static int RP1_Init(LIBBASETYPEPTR LIBBASE)
     }
 
     /* Read BAR1 (memory-mapped, 64-bit capable) */
-    bar1 = pcie_cfg_read(1, 0, 0, 0x14) & ~0xF;
+    bar1 = ((IPTR)pcie_cfg_read(1, 0, 0, 0x18) << 32) | (pcie_cfg_read(1, 0, 0, 0x14) & ~0xF);
 
     if (bar1 == 0 || bar1 == 0xFFFFFFFF) {
         D(bug("[RP1] BAR1 not assigned (0x%08lx) — PCIe RC not initialized?\n", bar1));

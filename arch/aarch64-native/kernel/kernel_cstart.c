@@ -73,6 +73,7 @@ void uart_puthex(uint64_t val);
 static void clear_bss(struct TagItem *msg);
 static void setup_vectors(void);
 void kernel_cstart(struct TagItem *msg);
+static void __attribute__((noinline, noreturn)) kernel_cstart_post_sp(void);
 
 /* Globals — defined in kernel_startup.c */
 extern struct AARCH64_Implementation __aarch64_arosintern;
@@ -182,6 +183,7 @@ void __attribute__((noinline)) kernel_cstart(struct TagItem *msg)
     __tls->TDNestCnt = -1;
     __tls->SupervisorCount = 0;
     __tls->ScheduleData = NULL;
+    __tls->FPUOwner = NULL;
 
     /* Set TLS pointer in TPIDR_EL1 */
     __asm__ volatile("msr tpidr_el1, %0" : : "r"(__tls));
@@ -305,13 +307,24 @@ void __attribute__((noinline)) kernel_cstart(struct TagItem *msg)
             t->tc_SPUpper = newStack + AROS_STACKSIZE;
             t->tc_SPReg = t->tc_SPUpper;
             __asm__ volatile(
-                "mov sp, %0"
+                "mov sp, %0\n"
                 : : "r"((IPTR)t->tc_SPUpper - 16)
                 : "memory"
             );
+            kernel_cstart_post_sp();
         }
     }
 
+    for (;;) __asm__ volatile("wfe");
+}
+
+/*
+ * kernel_cstart_post_sp — continues kernel_cstart after the SP switch.
+ * Separated to prevent the compiler from keeping stale references to
+ * locals that lived on the old (kernel) stack.
+ */
+static void __attribute__((noinline, noreturn)) kernel_cstart_post_sp(void)
+{
     /*
      * Register the kernel memory area with exec so TypeOfMem()
      * recognizes kernel-space pointers. This is needed because

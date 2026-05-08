@@ -473,6 +473,7 @@ static void handle_session(ssh_session session)
                     break;
                 case SSH_CHANNEL_REQUEST_EXEC:
                     exec_cmd = ssh_message_channel_request_command(msg);
+                    if (exec_cmd) exec_cmd = strdup(exec_cmd);
                     ssh_message_channel_request_reply_success(msg);
                     got_shell = TRUE;
                     break;
@@ -523,6 +524,7 @@ static void handle_session(ssh_session session)
             if (out_r) Close(out_r);
             ssh_channel_write(channel, "Error: cannot execute command\r\n", 30);
         }
+        free((void *)exec_cmd);
     }
     else
     {
@@ -662,6 +664,22 @@ int main(int argc, char **argv)
         {
             Printf("sshd: Shutdown requested\n");
             break;
+        }
+
+        /* Use WaitSelect with 1-second timeout to allow periodic signal checks */
+        {
+            int bind_fd = ssh_bind_get_fd(sshbind);
+            fd_set rfds;
+            struct timeval tv;
+
+            FD_ZERO(&rfds);
+            FD_SET(bind_fd, &rfds);
+            tv.tv_sec = 1;
+            tv.tv_usec = 0;
+
+            int sel = WaitSelect(bind_fd + 1, &rfds, NULL, NULL, &tv, NULL);
+            if (sel <= 0)
+                continue; /* timeout or error — loop back to check CTRL-C */
         }
 
         ssh_session session = ssh_new();

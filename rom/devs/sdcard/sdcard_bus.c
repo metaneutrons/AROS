@@ -811,7 +811,8 @@ ULONG FNAME_SDCBUS(FinishData)(struct TagItem *DataTags, struct sdcard_Bus *bus)
             (((IPTR)sdData & 3) == 0) && (sdDataLen >= 4))
         {
             /* ADMA2 descriptor: 64-bit address mode (8 bytes per entry) */
-            static volatile ULONG __attribute__((aligned(32))) adma_desc[4];
+            ULONG adma_buf[8] __attribute__((aligned(32)));
+            volatile ULONG *adma_desc = (volatile ULONG *)adma_buf;
             adma_desc[0] = (0x21 | (sdDataLen << 16));  /* Valid + End + Act=Tran + Length */
             adma_desc[1] = 0;                            /* Attr high (unused in 32-bit) */
             adma_desc[2] = (ULONG)(IPTR)sdData;          /* Address low */

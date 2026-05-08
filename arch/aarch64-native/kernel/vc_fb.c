@@ -276,6 +276,7 @@ int vcfb_init(void)
             i += 3 + (resp[i + 1] >> 2);
             if (i > c) { uart_puts("[FB] FBALLOC not found\n"); return 0; }
         }
+        if (resp[i] == 0) { uart_puts("[FB] FBALLOC not found\n"); return 0; }
 
         if ((resp[i + 2] & 0x7FFFFFFF) != 8)
         {

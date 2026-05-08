@@ -158,17 +158,17 @@ void dwmac_hw_init(struct DWMACUnit *unit)
     /* Initialize TX descriptors */
     for (i = 0; i < TX_RING_SIZE; i++) {
         unit->du_TxDesc[i].status = 0;
-        unit->du_TxDesc[i].ctrl = DESC_TX_CHAIN;
-        unit->du_TxDesc[i].buf_addr = (ULONG)(IPTR)(unit->du_TxBuf + i * ETH_BUF_SIZE);
-        unit->du_TxDesc[i].next_desc = (ULONG)(IPTR)&unit->du_TxDesc[(i + 1) % TX_RING_SIZE];
+        unit->du_TxDesc[i].ctrl = AROS_LONG2LE(DESC_TX_CHAIN);
+        unit->du_TxDesc[i].buf_addr = AROS_LONG2LE((ULONG)(IPTR)(unit->du_TxBuf + i * ETH_BUF_SIZE));
+        unit->du_TxDesc[i].next_desc = AROS_LONG2LE((ULONG)(IPTR)&unit->du_TxDesc[(i + 1) % TX_RING_SIZE]);
     }
 
     /* Initialize RX descriptors */
     for (i = 0; i < RX_RING_SIZE; i++) {
-        unit->du_RxDesc[i].status = DESC_OWN;
-        unit->du_RxDesc[i].ctrl = DESC_RX_CHAIN | (ETH_BUF_SIZE << DESC_CTRL_SIZE1_SHIFT);
-        unit->du_RxDesc[i].buf_addr = (ULONG)(IPTR)(unit->du_RxBuf + i * ETH_BUF_SIZE);
-        unit->du_RxDesc[i].next_desc = (ULONG)(IPTR)&unit->du_RxDesc[(i + 1) % RX_RING_SIZE];
+        unit->du_RxDesc[i].status = AROS_LONG2LE(DESC_OWN);
+        unit->du_RxDesc[i].ctrl = AROS_LONG2LE(DESC_RX_CHAIN | (ETH_BUF_SIZE << DESC_CTRL_SIZE1_SHIFT));
+        unit->du_RxDesc[i].buf_addr = AROS_LONG2LE((ULONG)(IPTR)(unit->du_RxBuf + i * ETH_BUF_SIZE));
+        unit->du_RxDesc[i].next_desc = AROS_LONG2LE((ULONG)(IPTR)&unit->du_RxDesc[(i + 1) % RX_RING_SIZE]);
     }
 
     /* Set descriptor list addresses */
@@ -291,7 +291,7 @@ void dwmac_rx_poll(struct DWMACUnit *unit)
                     CopyMem(pkt + ETH_ADDRSIZE, req->ios2_SrcAddr, ETH_ADDRSIZE);
                     req->ios2_PacketType = (pkt[12] << 8) | pkt[13];
                     req->ios2_DataLength = length - ETH_HEADERSIZE;
-                    CopyMem(pkt + ETH_HEADERSIZE, req->ios2_Data, req->ios2_DataLength);
+                    ((BOOL (*)(APTR, APTR, ULONG))((APTR *)req->ios2_BufferManagement)[0])(req->ios2_Data, pkt + ETH_HEADERSIZE, length - ETH_HEADERSIZE);
                     req->ios2_Req.io_Error = 0;
                     ReplyMsg((struct Message *)req);
                     unit->du_Stats.PacketsReceived++;
