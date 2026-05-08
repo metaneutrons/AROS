@@ -356,14 +356,6 @@ void * tlsf_malloc(struct MemHeaderExt *mhe, IPTR size, ULONG *flags)
     if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
         ObtainSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
 
-    /* Double-free detection (must be after semaphore for SMP safety) */
-    if (FREE_BLOCK(fb)) {
-        D(bug("[TLSF] DOUBLE FREE! ptr=%p size=%ld\n", ptr, (long)GET_SIZE(fb)));
-        if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
-            ReleaseSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
-        return;
-    }
-
     /* Find the indices fl and sl for given size */
     MAPPING_SEARCH(&size, &fl, &sl);
 
@@ -570,14 +562,6 @@ void * tlsf_malloc_aligned(struct MemHeaderExt *mhe, IPTR size, IPTR align, ULON
     if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
         ObtainSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
 
-    /* Double-free detection (must be after semaphore for SMP safety) */
-    if (FREE_BLOCK(fb)) {
-        D(bug("[TLSF] DOUBLE FREE! ptr=%p size=%ld\n", ptr, (long)GET_SIZE(fb)));
-        if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
-            ReleaseSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
-        return;
-    }
-
     size = ROUNDUP(size);
 
     D(nbug("[Kernel:TLSF] %s(%p, %lx, %u)\n", __PRETTY_FUNCTION__, mhe, size, align));
@@ -688,13 +672,13 @@ void tlsf_freevec(struct MemHeaderExt * mhe, APTR ptr)
 
     fb = MEM_TO_BHDR(ptr);
 
-
     if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
         ObtainSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
 
-    /* Double-free detection (must be after semaphore for SMP safety) */
-    if (FREE_BLOCK(fb)) {
-        D(bug("[TLSF] DOUBLE FREE! ptr=%p size=%ld\n", ptr, (long)GET_SIZE(fb)));
+    /* Double-free detection (after semaphore for SMP safety) */
+    if (FREE_BLOCK(fb))
+    {
+        D(nbug("[Kernel:TLSF] DOUBLE FREE! ptr=%p size=%lu\n", ptr, (unsigned long)GET_SIZE(fb)));
         if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
             ReleaseSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
         return;
@@ -763,14 +747,6 @@ void * tlsf_realloc(struct MemHeaderExt *mhe, APTR ptr, IPTR new_size)
 
     if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
         ObtainSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
-
-    /* Double-free detection (must be after semaphore for SMP safety) */
-    if (FREE_BLOCK(fb)) {
-        D(bug("[TLSF] DOUBLE FREE! ptr=%p size=%ld\n", ptr, (long)GET_SIZE(fb)));
-        if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
-            ReleaseSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
-        return;
-    }
 
     bnext = GET_NEXT_BHDR(b, GET_SIZE(b));
 
@@ -882,14 +858,6 @@ void * tlsf_allocabs(struct MemHeaderExt * mhe, IPTR size, void * ptr)
 
     if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
         ObtainSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
-
-    /* Double-free detection (must be after semaphore for SMP safety) */
-    if (FREE_BLOCK(fb)) {
-        D(bug("[TLSF] DOUBLE FREE! ptr=%p size=%ld\n", ptr, (long)GET_SIZE(fb)));
-        if (((ULONG)(IPTR)mhe->mhe_MemHeader.mh_First) & MEMF_SEM_PROTECTED)
-            ReleaseSemaphore((struct SignalSemaphore *)mhe->mhe_MemHeader.mh_Node.ln_Name);
-        return;
-    }
 
     /* Start searching here. It doesn't make sense to go through regions which are smaller */
     MAPPING_SEARCH(&region_size, &fl, &sl);
