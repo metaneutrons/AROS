@@ -207,6 +207,7 @@ int v3d_ioctl_aros(struct V3DData *sd, unsigned long request, void *arg)
     case DRM_IOCTL_V3D_GET_PARAM:
     {
         struct drm_v3d_get_param *p = arg;
+        if (!sd || !sd->powered) { p->value = 0; return -1; }
         ULONG val;
 
         switch (p->param) {

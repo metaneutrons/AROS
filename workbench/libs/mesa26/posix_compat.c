@@ -81,16 +81,36 @@ char *dlerror(void) { return "not supported"; }
 /* misc */
 int getpagesize(void) { return 4096; }
 long sysconf(int n) { (void)n; return 4096; }
+/*
+ * posix_memalign + free override.
+ * Mesa calls free() on posix_memalign'd pointers. We store the original
+ * malloc pointer at offset [-1] with a magic marker at [-2] so our
+ * free() can detect and handle aligned pointers correctly.
+ */
+#define MEMALIGN_MAGIC 0xA110CA7E
+
 int posix_memalign(void **ptr, size_t align, size_t size) {
-    void *raw = malloc(size + align + sizeof(void *));
+    if (align < sizeof(void *)) align = sizeof(void *);
+    void *raw = malloc(size + align + 2 * sizeof(void *));
     if (!raw) return -1;
-    uintptr_t aligned = ((uintptr_t)raw + sizeof(void *) + align - 1) & ~(align - 1);
+    uintptr_t base = (uintptr_t)raw + 2 * sizeof(void *);
+    uintptr_t aligned = (base + align - 1) & ~(align - 1);
     ((void **)aligned)[-1] = raw;
+    ((uintptr_t *)aligned)[-2] = MEMALIGN_MAGIC;
     *ptr = (void *)aligned;
     return 0;
 }
-void aligned_free(void *ptr) {
-    if (ptr) free(((void **)ptr)[-1]);
+
+void free(void *ptr) {
+    if (!ptr) return;
+    /* Check if this is an aligned pointer from posix_memalign */
+    if (((uintptr_t *)ptr)[-2] == MEMALIGN_MAGIC) {
+        void *raw = ((void **)ptr)[-1];
+        ((uintptr_t *)ptr)[-2] = 0;  /* prevent double-free detection */
+        FreeVec(raw);
+    } else {
+        FreeVec(ptr);
+    }
 }
 unsigned int sleep(unsigned int s) { (void)s; return 0; }
 int usleep(unsigned int u) { (void)u; return 0; }

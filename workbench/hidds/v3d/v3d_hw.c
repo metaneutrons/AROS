@@ -142,7 +142,7 @@ struct V3DBO *v3d_aros_bo_alloc(struct V3DData *sd, ULONG size)
 
 void v3d_aros_bo_free(struct V3DData *sd, struct V3DBO *bo)
 {
-    if (--bo->refcount > 0)
+    if (__sync_sub_and_fetch(&bo->refcount, 1) > 0)
         return;
 
     ObtainSemaphore(&sd->bo_lock);
