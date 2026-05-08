@@ -171,6 +171,9 @@ VectorTable:
  */
     .globl SynchronousStub
 SynchronousStub:
+    /* Save original x0/x1 before clobbering them */
+    stp     x0, x1, [sp, #-16]!
+
     /* Check if SVC (ESR_EL1.EC == 0x15) */
     mrs     x0, esr_el1
     lsr     x1, x0, #26
@@ -191,6 +194,7 @@ SynchronousStub:
     b.eq    .Lsvc_switch_path
 
     /* Unknown syscall — just return */
+    ldp     x0, x1, [sp], #16
     eret
 
 .Lsvc_cause:
@@ -200,6 +204,7 @@ SynchronousStub:
      * core_SysCall handles SC_CAUSE/SC_SCHEDULE/SC_SWITCH/SC_DISPATCH
      * via cpu_Switch/cpu_Dispatch which modify the regs in-place.
      */
+    ldp     x0, x1, [sp], #16      /* restore original x0/x1 */
     SAVE_FULL_CONTEXT
 
     /* Re-extract syscall number from ESR_EL1 (save_context clobbered x0) */
@@ -235,13 +240,13 @@ SynchronousStub:
     /*
      * Non-SVC synchronous exception.
      * Check for FPU trap (EC=0x07) first — handle without full context save.
+     * x0/x1 already contain ESR and EC from above (x0=esr, x1=EC).
      */
-    mrs     x0, esr_el1
-    lsr     x1, x0, #26            /* EC field */
     cmp     x1, #0x07              /* EC=0x07: FP/SIMD access trap */
     b.ne    .Lsync_not_fpu
 
-    /* FPU trap — save x0-x17, x29, x30 around the handler call */
+    /* FPU trap — restore original x0/x1, then save x0-x17, x29, x30 */
+    ldp     x0, x1, [sp], #16
     stp     x29, x30, [sp, #-160]!
     stp     x0,  x1,  [sp, #16]
     stp     x2,  x3,  [sp, #32]
@@ -270,6 +275,7 @@ SynchronousStub:
      * Other synchronous exception (data abort, etc.)
      * Save full context, call ExceptionHandler.
      */
+    ldp     x0, x1, [sp], #16      /* restore original x0/x1 */
     SAVE_FULL_CONTEXT
 
     mov     x0, #1                  /* exception type = synchronous */

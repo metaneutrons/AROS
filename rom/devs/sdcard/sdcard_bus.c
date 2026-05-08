@@ -816,11 +816,9 @@ ULONG FNAME_SDCBUS(FinishData)(struct TagItem *DataTags, struct sdcard_Bus *bus)
             if (adma_desc)
             {
                 adma_desc[0] = (0x21 | (sdDataLen << 16));  /* Valid + End + Act=Tran + Length */
-                adma_desc[1] = 0;                            /* Attr high (unused in 32-bit) */
-                adma_desc[2] = (ULONG)(IPTR)sdData;          /* Address low */
-                adma_desc[3] = 0;                            /* Address high */
+                adma_desc[1] = (ULONG)(IPTR)sdData;          /* 32-bit buffer address */
 
-                CacheClearE((APTR)adma_desc, 32, CACRF_ClearD);
+                CacheClearE((APTR)adma_desc, 8, CACRF_ClearD);
 
                 /* Set ADMA2 mode in Host Control */
                 UBYTE hctrl = bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, bus);

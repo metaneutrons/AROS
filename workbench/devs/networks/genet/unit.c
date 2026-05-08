@@ -107,8 +107,14 @@ static void genet_TxPackets(struct GENETUnit *unit)
     while ((req = (struct IOSana2Req *)RemHead((struct List *)&unit->gn_WriteList))) {
         ReleaseSemaphore(&unit->gn_Lock);
 
-        /* Build Ethernet frame in a temporary buffer */
-        UBYTE frame[ETH_MAXPACKETSIZE];
+        /* Build Ethernet frame in a DMA-safe buffer */
+        UBYTE *frame = AllocMem(ETH_MAXPACKETSIZE, MEMF_PUBLIC | MEMF_31BIT);
+        if (!frame) {
+            req->ios2_Req.io_Error = S2ERR_NO_RESOURCES;
+            ReplyMsg((struct Message *)req);
+            ObtainSemaphore(&unit->gn_Lock);
+            continue;
+        }
         ULONG framelen;
         struct Opener *opener = req->ios2_BufferManagement;
 
@@ -144,6 +150,7 @@ static void genet_TxPackets(struct GENETUnit *unit)
             req->ios2_Req.io_Error = S2ERR_TX_FAILURE;
         }
 
+        FreeMem(frame, ETH_MAXPACKETSIZE);
         ReplyMsg((struct Message *)req);
         ObtainSemaphore(&unit->gn_Lock);
     }

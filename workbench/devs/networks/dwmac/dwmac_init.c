@@ -93,8 +93,8 @@ static int dwmac_Init(LIBBASETYPEPTR LIBBASE)
                                MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
 
     /* Allocate TX/RX buffers */
-    unit->du_TxBuf = AllocVec(TX_RING_SIZE * ETH_BUF_SIZE, MEMF_CLEAR | MEMF_PUBLIC);
-    unit->du_RxBuf = AllocVec(RX_RING_SIZE * ETH_BUF_SIZE, MEMF_CLEAR | MEMF_PUBLIC);
+    unit->du_TxBuf = AllocVec(TX_RING_SIZE * ETH_BUF_SIZE, MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
+    unit->du_RxBuf = AllocVec(RX_RING_SIZE * ETH_BUF_SIZE, MEMF_CLEAR | MEMF_PUBLIC | MEMF_31BIT);
 
     if (!unit->du_TxDesc || !unit->du_RxDesc || !unit->du_TxBuf || !unit->du_RxBuf) {
         D(bug("[dwmac] Memory allocation failed\n"));

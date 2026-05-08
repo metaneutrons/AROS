@@ -92,6 +92,16 @@ static void *alloc_page_table(void)
     return (void *)(((uintptr_t)raw + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1));
 }
 
+/* Allocate 8KB-aligned, 2-page L1 table for 40-bit VA */
+static void *alloc_l1_table_40bit(void)
+{
+    /* Allocate 3 pages to guarantee 8KB alignment within */
+    void *raw = malloc(PAGE_SIZE * 3);
+    if (!raw) return (void *)0;
+    uintptr_t aligned = ((uintptr_t)raw + (2 * PAGE_SIZE) - 1) & ~((2 * PAGE_SIZE) - 1);
+    return (void *)aligned;
+}
+
 static uint64_t block_desc(uint64_t phys, int attr, uint64_t sh)
 {
     return DESC_VALID | DESC_BLOCK |
@@ -130,13 +140,31 @@ void mmu_load(void)
 {
     unsigned int gb, mb;
 
-    l1_table = alloc_page_table();
+    /*
+     * Detect 40-bit VA need early — BCM2712 (RPi5, Cortex-A76) peripherals
+     * live at 0x107C000000 which requires >36-bit VA.
+     * With 4KB granule and 40-bit VA, L1 has 1024 entries = 8KB (2 pages),
+     * and must be 8KB-aligned.
+     */
+    int use_40bit = 0;
+    {
+        uint64_t midr;
+        __asm__ volatile("mrs %0, midr_el1" : "=r"(midr));
+        if (((midr >> 4) & 0xFFF) == 0xD0B)
+            use_40bit = 1;
+    }
+
+    if (use_40bit) {
+        l1_table = alloc_l1_table_40bit();
+    } else {
+        l1_table = alloc_page_table();
+    }
     if (!l1_table)
     {
         kprintf("[BOOT] MMU: Failed to allocate L1 table!\n");
         return;
     }
-    memset(l1_table, 0, PAGE_SIZE);
+    memset(l1_table, 0, use_40bit ? (2 * PAGE_SIZE) : PAGE_SIZE);
 
     for (gb = 0; gb < 4; gb++)
     {
@@ -171,26 +199,19 @@ void mmu_load(void)
      * Extend to 40-bit VA/PA only when running on Cortex-A76 (RPi5).
      * QEMU's raspi4b does not support 40-bit PA and will fault.
      */
-    int use_40bit = 0;
+    if (use_40bit)
     {
-        uint64_t midr;
-        __asm__ volatile("mrs %0, midr_el1" : "=r"(midr));
-        /* Cortex-A76 part number = 0xD0B (ARM implementer 0x41) */
-        if (((midr >> 4) & 0xFFF) == 0xD0B)
-        {
-            use_40bit = 1;
-            unsigned int bcm2712_gb = 4;
-            uint64_t *l2 = alloc_page_table();
-            if (l2) {
-                memset(l2, 0, PAGE_SIZE);
-                for (mb = 0; mb < ENTRIES_PER_TABLE; mb++) {
-                    uint64_t addr = (uint64_t)bcm2712_gb * L1_BLOCK_SIZE +
-                                    (uint64_t)mb * L2_BLOCK_SIZE;
-                    l2[mb] = block_desc(addr, ATTR_DEVICE, DESC_SH_OUTER);
-                }
-                l1_table[bcm2712_gb] = DESC_VALID | DESC_TABLE |
-                                        ((uint64_t)l2 & 0x0000FFFFFFFFF000UL);
+        unsigned int bcm2712_gb = 4;
+        uint64_t *l2 = alloc_page_table();
+        if (l2) {
+            memset(l2, 0, PAGE_SIZE);
+            for (mb = 0; mb < ENTRIES_PER_TABLE; mb++) {
+                uint64_t addr = (uint64_t)bcm2712_gb * L1_BLOCK_SIZE +
+                                (uint64_t)mb * L2_BLOCK_SIZE;
+                l2[mb] = block_desc(addr, ATTR_DEVICE, DESC_SH_OUTER);
             }
+            l1_table[bcm2712_gb] = DESC_VALID | DESC_TABLE |
+                                    ((uint64_t)l2 & 0x0000FFFFFFFFF000UL);
         }
     }
 
