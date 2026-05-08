@@ -1,5 +1,5 @@
 #ifndef GENET_H
- * Author: Fabian Schmieder
+/* Author: Fabian Schmieder */
 #define GENET_H
 
 #include <exec/types.h>

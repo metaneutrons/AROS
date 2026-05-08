@@ -1,5 +1,5 @@
 #ifndef USB2OTG_INTERN_H
- * Author: Fabian Schmieder
+/* Author: Fabian Schmieder */
 #define USB2OTG_INTERN_H
 /*
     Copyright © 2013-2019, The AROS Development Team. All rights reserved.

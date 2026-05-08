@@ -1,5 +1,5 @@
 #ifndef I2C_BCM2711_H
- * Author: Fabian Schmieder
+/* Author: Fabian Schmieder */
 #define I2C_BCM2711_H
 
 #include <exec/types.h>

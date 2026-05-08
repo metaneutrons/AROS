@@ -1,5 +1,5 @@
 #ifndef RNG_PRIVATE_H
- * Author: Fabian Schmieder
+/* Author: Fabian Schmieder */
 #define RNG_PRIVATE_H
 
 #include <exec/nodes.h>

@@ -1,5 +1,5 @@
 #ifndef _SDCARDBCM2708_INTERN_H
- * Author: Fabian Schmieder
+/* Author: Fabian Schmieder */
 #define _SDCARDBCM2708_INTERN_H
 /*
     Copyright © 2013-2015, The AROS Development Team. All rights reserved.

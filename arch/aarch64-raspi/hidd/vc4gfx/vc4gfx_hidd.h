@@ -1,5 +1,5 @@
 #ifndef _VIDEOCOREGFX_CLASS_H
- * Author: Fabian Schmieder
+/* Author: Fabian Schmieder */
 #define _VIDEOCOREGFX_CLASS_H
 /*
     Copyright � 2013-2017, The AROS Development Team. All rights reserved.
