@@ -82,35 +82,70 @@ char *dlerror(void) { return "not supported"; }
 int getpagesize(void) { return 4096; }
 long sysconf(int n) { (void)n; return 4096; }
 /*
- * posix_memalign + free override.
- * Mesa calls free() on posix_memalign'd pointers. We store the original
- * malloc pointer at offset [-1] with a magic marker at [-2] so our
- * free() can detect and handle aligned pointers correctly.
+ * Unified malloc/free/posix_memalign.
+ * All allocations go through AllocVec with a header storing size.
+ * posix_memalign additionally aligns and stores the raw pointer.
+ * free() handles both cases safely without magic-number guessing.
  */
-#define MEMALIGN_MAGIC 0xA110CA7E
 
-int posix_memalign(void **ptr, size_t align, size_t size) {
-    if (align < sizeof(void *)) align = sizeof(void *);
-    void *raw = malloc(size + align + 2 * sizeof(void *));
-    if (!raw) return -1;
-    uintptr_t base = (uintptr_t)raw + 2 * sizeof(void *);
-    uintptr_t aligned = (base + align - 1) & ~(align - 1);
-    ((void **)aligned)[-1] = raw;
-    ((uintptr_t *)aligned)[-2] = MEMALIGN_MAGIC;
-    *ptr = (void *)aligned;
-    return 0;
+/* Header prepended to every malloc allocation */
+struct MallocHdr {
+    void *raw;      /* original AllocVec pointer (== &hdr for normal malloc) */
+    size_t size;    /* requested size */
+};
+
+void *malloc(size_t size) {
+    struct MallocHdr *hdr = (struct MallocHdr *)AllocVec(
+        sizeof(struct MallocHdr) + size, MEMF_PUBLIC);
+    if (!hdr) return NULL;
+    hdr->raw = hdr;
+    hdr->size = size;
+    return (void *)(hdr + 1);
+}
+
+void *calloc(size_t n, size_t size) {
+    size_t total = n * size;
+    struct MallocHdr *hdr = (struct MallocHdr *)AllocVec(
+        sizeof(struct MallocHdr) + total, MEMF_PUBLIC | MEMF_CLEAR);
+    if (!hdr) return NULL;
+    hdr->raw = hdr;
+    hdr->size = total;
+    return (void *)(hdr + 1);
+}
+
+void *realloc(void *ptr, size_t size) {
+    if (!ptr) return malloc(size);
+    if (size == 0) { free(ptr); return NULL; }
+    struct MallocHdr *old_hdr = ((struct MallocHdr *)ptr) - 1;
+    void *new_ptr = malloc(size);
+    if (new_ptr) {
+        size_t copy = old_hdr->size < size ? old_hdr->size : size;
+        memcpy(new_ptr, ptr, copy);
+        free(ptr);
+    }
+    return new_ptr;
 }
 
 void free(void *ptr) {
     if (!ptr) return;
-    /* Check if this is an aligned pointer from posix_memalign */
-    if (((uintptr_t *)ptr)[-2] == MEMALIGN_MAGIC) {
-        void *raw = ((void **)ptr)[-1];
-        ((uintptr_t *)ptr)[-2] = 0;  /* prevent double-free detection */
-        FreeVec(raw);
-    } else {
-        FreeVec(ptr);
-    }
+    struct MallocHdr *hdr = ((struct MallocHdr *)ptr) - 1;
+    FreeVec(hdr->raw);
+}
+
+int posix_memalign(void **ptr, size_t align, size_t size) {
+    if (align < sizeof(void *)) align = sizeof(void *);
+    /* Allocate enough for alignment + header */
+    size_t alloc_size = sizeof(struct MallocHdr) + size + align;
+    void *raw = AllocVec(alloc_size, MEMF_PUBLIC);
+    if (!raw) return -1;
+    uintptr_t base = (uintptr_t)raw + sizeof(struct MallocHdr) + align - 1;
+    uintptr_t aligned = base & ~(align - 1);
+    /* Place header just before the aligned pointer */
+    struct MallocHdr *hdr = ((struct MallocHdr *)aligned) - 1;
+    hdr->raw = raw;
+    hdr->size = size;
+    *ptr = (void *)aligned;
+    return 0;
 }
 unsigned int sleep(unsigned int s) { (void)s; return 0; }
 int usleep(unsigned int u) { (void)u; return 0; }
