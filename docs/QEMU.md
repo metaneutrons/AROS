@@ -96,3 +96,18 @@ cause signal propagation issues that kill QEMU unexpectedly.
 | build-verify  | Apr 24     | SMP     | Boots fully (pre-40bit MMU) |
 | build-test    | May 5      | SMP     | Needs MMU fix (has 40-bit) |
 | build-fresh   | May 6      | SMP     | Boots fully (MMU fix applied) |
+
+## Building a QEMU-compatible BSP
+
+The default BSP includes drivers (genet, pci-bcm2711, pcixhci) that access
+hardware not emulated by QEMU, causing a bus fault after boot. To build a
+BSP without these drivers:
+
+```bash
+make kernel-package-raspi-aarch64 \
+  PKG_DEVS="input gameport keyboard console sdcard USBHardware/usb2otg" \
+  PKG_HIDDS="gfx inputclass mouse keyboard hiddclass vc4gfx" \
+  AARCH64_BSP=aros-aarch64-bsp-qemu.rom
+```
+
+Then use `aros-aarch64-bsp-qemu.rom` as the `-initrd` in QEMU.
