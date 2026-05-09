@@ -124,9 +124,9 @@ $(MODEFILE):	$(MODEFILE).o
 	$(OBJCOPY) --output-target=binary $< $@
 
 $(MODEFILE).o: MODEFILE.s $(MODEFILE).s
-	cat $^ | \
+	cat MODEFILE.s $(MODEFILE).s | \
 	$(CC) $(ASFLAGS) $(ASCPPFLAGS) \
-	       -c - -o $@
+	       -x assembler -c - -o $@
 
 gatestubs.c:	$(top_srcdir)/Include/SFD/ahi_sub_lib.sfd
 	$(SFDC) --mode=gatestubs --gateprefix=gw --libprefix=_ --libarg=last \
