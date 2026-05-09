@@ -111,3 +111,26 @@ make kernel-package-raspi-aarch64 \
 ```
 
 Then use `aros-aarch64-bsp-qemu.rom` as the `-initrd` in QEMU.
+
+## QEMU 11.0.0 Regression
+
+QEMU 11.0.0 has a regression in the raspi4b machine emulation that causes
+an instruction abort during InitCode(RTF_SINGLETASK). The same binary that
+boots successfully on QEMU 10.2.2-3 crashes on 11.0.0 with:
+
+```
+*** EXCEPTION 0x1 ***
+  ESR_EL1: 0x86000004 (EC=0x21 - Instruction Abort)
+  ELR_EL1: 0xd61f008058000084 (garbage - PLT opcodes as address)
+```
+
+This is confirmed as a QEMU bug: the exact same unmodified binary crashes.
+Use QEMU 10.2.2 or real hardware for testing until this is fixed upstream.
+
+Required Arch Linux packages for QEMU 10.2.2-3:
+- qemu-common-10.2.2-3
+- qemu-system-aarch64-10.2.2-3
+- qemu-hw-display-virtio-gpu-10.2.2-3
+
+Note: QEMU 10.2.2-3 requires glib2 <= 2.82.x. If glib2 has been updated
+beyond this, QEMU 10.2.2 may also exhibit issues.
