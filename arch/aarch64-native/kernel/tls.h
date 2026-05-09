@@ -21,6 +21,7 @@ typedef struct tls
     BYTE                SupervisorCount; /* >0 when in exception handler */
     BYTE                Pad0;
     struct AArch64SchedulerPrivate *ScheduleData; /* Per-CPU scheduler state (SMP) */
+    struct Task         *FPUOwner;  /* Per-CPU: last task that used the FPU */
 } tls_t;
 
 #define TLSSF_Quantum   (1 << 0)
