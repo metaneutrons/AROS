@@ -121,12 +121,20 @@ $(DRIVER):		$(DRIVER_OBJECTS)
 	$(CC) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(MODEFILE):	$(MODEFILE).o
+ifneq ($(CPU),m68k)
+	touch $@
+else
 	$(OBJCOPY) --output-target=binary $< $@
+endif
 
 $(MODEFILE).o: MODEFILE.s $(MODEFILE).s
+ifneq ($(CPU),m68k)
+	echo "" | $(CC) -x assembler -c - -o $@
+else
 	cat MODEFILE.s $(MODEFILE).s | \
 	$(CC) $(ASFLAGS) $(ASCPPFLAGS) \
 	       -x assembler -c - -o $@
+endif
 
 gatestubs.c:	$(top_srcdir)/Include/SFD/ahi_sub_lib.sfd
 	$(SFDC) --mode=gatestubs --gateprefix=gw --libprefix=_ --libarg=last \
