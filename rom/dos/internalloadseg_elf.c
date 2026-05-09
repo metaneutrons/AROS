@@ -676,6 +676,8 @@ static int relocate
 
             case R_ARM_NONE:
                 break;
+            #elif defined(__aarch64__)
+
             #elif defined(__riscv)
 
             #else
