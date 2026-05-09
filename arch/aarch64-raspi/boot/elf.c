@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
     Desc: ELF64 loader for AArch64 bootstrap.
           Loads core.elf into high memory, performs RELA relocations.
           Based on arch/arm-raspi/boot/elf.c, adapted for ELF64/AArch64.
@@ -107,6 +106,7 @@ int getElfSize(void *elf_file, uint64_t *size_rw, uint64_t *size_ro)
          * Each R_AARCH64_ADR_GOT_PAGE relocation needs an 8-byte GOT entry.
          */
         uint64_t got_size = 0;
+        if (!checkHeader(eh))
         {
             struct sheader *sh = (struct sheader *)((uintptr_t)elf_file + eh->shoff);
             for (unsigned i = 0; i < int_shnum; i++)
@@ -144,18 +144,16 @@ static struct bss_tracker *bss_tracker = &tracker[0];
 static int load_hunk(void *file, struct sheader *sh)
 {
     void *ptr = (void *)0;
-    uint64_t align = sh->addralign;
-    if (align == 0) align = 1;
     if (!sh->size) return 1;
     if (sh->flags & SHF_WRITE)
     {
-        ptr_rw = (ptr_rw + align - 1) & ~(align - 1);
+        ptr_rw = (ptr_rw + sh->addralign - 1) & ~(sh->addralign - 1);
         ptr = (void *)ptr_rw;
         ptr_rw += sh->size;
     }
     else
     {
-        ptr_ro = (ptr_ro + align - 1) & ~(align - 1);
+        ptr_ro = (ptr_ro + sh->addralign - 1) & ~(sh->addralign - 1);
         ptr = (void *)ptr_ro;
         ptr_ro += sh->size;
     }
@@ -236,23 +234,13 @@ static int relocate(struct elfheader *eh, struct sheader *sh, long shrel_idx,
         {
         case R_AARCH64_ABS64:
             if (is_exec)
-            {
-                if (sym->shindex >= int_shnum)
-                    put_u64_unaligned((void *)p_addr, get_u64_unaligned((void *)p_addr) + voff);
-                else
-                    put_u64_unaligned((void *)p_addr, get_u64_unaligned((void *)p_addr) + (uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
-            }
+                put_u64_unaligned((void *)p_addr, get_u64_unaligned((void *)p_addr) + (uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
             else
                 put_u64_unaligned((void *)p_addr, s + voff);
             break;
         case R_AARCH64_ABS32:
             if (is_exec)
-            {
-                if (sym->shindex >= int_shnum)
-                    *(uint32_t *)p_addr += (uint32_t)(voff);
-                else
-                    *(uint32_t *)p_addr += (uint32_t)((uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
-            }
+                *(uint32_t *)p_addr += (uint32_t)((uintptr_t)sh[sym->shindex].addr - deltas[sym->shindex] + voff);
             else
                 *(uint32_t *)p_addr = (uint32_t)(s + voff);
             break;
@@ -378,8 +366,7 @@ uintptr_t loadElf(void *elf_file)
     {
         struct sheader *sh = (struct sheader *)((uintptr_t)elf_file + eh->shoff);
         uintptr_t deltas[int_shnum];
-        memset(deltas, 0, sizeof(IPTR) * int_shnum);
-
+        
         for (unsigned i = 0; i < int_shnum; i++)
         {
             if (sh[i].type == SHT_SYMTAB || sh[i].type == SHT_STRTAB)

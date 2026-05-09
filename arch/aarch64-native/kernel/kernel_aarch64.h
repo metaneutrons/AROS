@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: AArch64 hardware abstraction — equivalent to kernel_arm.h
 */
@@ -49,27 +48,5 @@ extern struct AARCH64_Implementation __aarch64_arosintern;
 #define BCM2711_PERIBASE        0xFE000000UL
 #define BCM2711_GICD_BASE       0xFF841000UL
 #define BCM2711_GICC_BASE       0xFF842000UL
-
-/* BCM2712 (Pi 5) hardware addresses */
-#define BCM2712_PERIBASE        0x107C000000ULL
-#define BCM2712_GICD_BASE       0xFF841000UL
-#define BCM2712_GICC_BASE       0xFF842000UL
-
-/* RP1 southbridge (PCIe-attached on Pi 5) */
-#define RP1_PCIE_VENDOR_ID      0x1de4
-#define RP1_PCIE_DEVICE_ID      0x0001
-#define RP1_BAR1_SIZE           0x400000  /* 4MB peripheral space */
-
-/* RP1 peripheral offsets within BAR1 */
-#define RP1_USB0_OFFSET         0x100000
-#define RP1_USB1_OFFSET         0x110000
-#define RP1_ETH_OFFSET          0x180000
-#define RP1_GPIO_OFFSET         0x0D0000
-#define RP1_I2C0_OFFSET         0x070000
-#define RP1_I2C1_OFFSET         0x074000
-#define RP1_I2C2_OFFSET         0x078000
-#define RP1_SPI0_OFFSET         0x050000
-#define RP1_UART0_OFFSET        0x030000
-#define RP1_UART1_OFFSET        0x034000
 
 #endif /* __KERNEL_AARCH64_H */

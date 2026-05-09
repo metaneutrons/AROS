@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: exec_platform.h for AArch64 native.
           TLS accessed via TPIDR_EL1 system register.
@@ -15,6 +14,18 @@
 
 #define SCHEDQUANTUM_VALUE      4
 #define SCHEDGRAN_VALUE         1
+
+#if defined(__AROSEXEC_SMP__)
+#include <aros/types/spinlock_s.h>
+#include <utility/hooks.h>
+
+extern void Kernel_40_KrnSpinInit(spinlock_t *, void *);
+#define EXEC_SPINLOCK_INIT(a) Kernel_40_KrnSpinInit((a), NULL)
+extern spinlock_t *Kernel_43_KrnSpinLock(spinlock_t *, struct Hook *, ULONG, void *);
+#define EXEC_SPINLOCK_LOCK(a,b) Kernel_43_KrnSpinLock((a), NULL, (b), NULL)
+extern void Kernel_44_KrnSpinUnLock(spinlock_t *, void *);
+#define EXEC_SPINLOCK_UNLOCK(a) Kernel_44_KrnSpinUnLock((a), NULL)
+#endif
 
 #if defined(__AROSEXEC_SMP__)
 #include <aros/types/spinlock_s.h>

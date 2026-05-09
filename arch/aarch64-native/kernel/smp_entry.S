@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: Secondary core startup for AArch64 SMP (spin-table method).
     Lang: english

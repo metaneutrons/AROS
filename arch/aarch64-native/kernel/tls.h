@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: Thread-Local Storage for AArch64 kernel.
           Uses TPIDR_EL1 (kernel-only TLS register).
@@ -22,7 +21,6 @@ typedef struct tls
     BYTE                SupervisorCount; /* >0 when in exception handler */
     BYTE                Pad0;
     struct AArch64SchedulerPrivate *ScheduleData; /* Per-CPU scheduler state (SMP) */
-    struct Task         *FPUOwner;  /* Per-CPU: last task that used the FPU */
 } tls_t;
 
 #define TLSSF_Quantum   (1 << 0)

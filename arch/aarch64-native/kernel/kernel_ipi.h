@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: IPI (Inter-Processor Interrupt) definitions for AArch64 SMP.
           Minimal implementation — IPI via GIC SGI to be added later.

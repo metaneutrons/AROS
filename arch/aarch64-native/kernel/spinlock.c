@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
     Desc: KrnSpinLock for AArch64 — single-CPU: interrupt masking with nesting.
 */
 

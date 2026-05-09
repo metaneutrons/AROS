@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: VideoCore mailbox framebuffer + boot console for BCM2711.
           Ported from arch/arm-raspi/boot/vc_fb.c, vc_mb.c, bc/screen_fb.c.
@@ -276,7 +275,6 @@ int vcfb_init(void)
             i += 3 + (resp[i + 1] >> 2);
             if (i > c) { uart_puts("[FB] FBALLOC not found\n"); return 0; }
         }
-        if (resp[i] == 0) { uart_puts("[FB] FBALLOC not found\n"); return 0; }
 
         if ((resp[i + 2] & 0x7FFFFFFF) != 8)
         {

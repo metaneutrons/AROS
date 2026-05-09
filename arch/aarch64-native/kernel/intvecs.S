@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Licensed under the AROS Public License (APL), Version 1.1.
 
@@ -171,9 +170,6 @@ VectorTable:
  */
     .globl SynchronousStub
 SynchronousStub:
-    /* Save original x0/x1 before clobbering them */
-    stp     x0, x1, [sp, #-16]!
-
     /* Check if SVC (ESR_EL1.EC == 0x15) */
     mrs     x0, esr_el1
     lsr     x1, x0, #26
@@ -194,7 +190,6 @@ SynchronousStub:
     b.eq    .Lsvc_switch_path
 
     /* Unknown syscall — just return */
-    ldp     x0, x1, [sp], #16
     eret
 
 .Lsvc_cause:
@@ -204,7 +199,6 @@ SynchronousStub:
      * core_SysCall handles SC_CAUSE/SC_SCHEDULE/SC_SWITCH/SC_DISPATCH
      * via cpu_Switch/cpu_Dispatch which modify the regs in-place.
      */
-    ldp     x0, x1, [sp], #16      /* restore original x0/x1 */
     SAVE_FULL_CONTEXT
 
     /* Re-extract syscall number from ESR_EL1 (save_context clobbered x0) */
@@ -238,44 +232,9 @@ SynchronousStub:
 
 .Lsync_not_svc:
     /*
-     * Non-SVC synchronous exception.
-     * Check for FPU trap (EC=0x07) first — handle without full context save.
-     * x0/x1 already contain ESR and EC from above (x0=esr, x1=EC).
-     */
-    cmp     x1, #0x07              /* EC=0x07: FP/SIMD access trap */
-    b.ne    .Lsync_not_fpu
-
-    /* FPU trap — restore original x0/x1, then save x0-x17, x29, x30 */
-    ldp     x0, x1, [sp], #16
-    stp     x29, x30, [sp, #-160]!
-    stp     x0,  x1,  [sp, #16]
-    stp     x2,  x3,  [sp, #32]
-    stp     x4,  x5,  [sp, #48]
-    stp     x6,  x7,  [sp, #64]
-    stp     x8,  x9,  [sp, #80]
-    stp     x10, x11, [sp, #96]
-    stp     x12, x13, [sp, #112]
-    stp     x14, x15, [sp, #128]
-    stp     x16, x17, [sp, #144]
-    bl      fpu_trap_handler
-    ldp     x16, x17, [sp, #144]
-    ldp     x14, x15, [sp, #128]
-    ldp     x12, x13, [sp, #112]
-    ldp     x10, x11, [sp, #96]
-    ldp     x8,  x9,  [sp, #80]
-    ldp     x6,  x7,  [sp, #64]
-    ldp     x4,  x5,  [sp, #48]
-    ldp     x2,  x3,  [sp, #32]
-    ldp     x0,  x1,  [sp, #16]
-    ldp     x29, x30, [sp], #160
-    eret
-
-.Lsync_not_fpu:
-    /*
-     * Other synchronous exception (data abort, etc.)
+     * Non-SVC synchronous exception (data abort, etc.)
      * Save full context, call ExceptionHandler.
      */
-    ldp     x0, x1, [sp], #16      /* restore original x0/x1 */
     SAVE_FULL_CONTEXT
 
     mov     x0, #1                  /* exception type = synchronous */

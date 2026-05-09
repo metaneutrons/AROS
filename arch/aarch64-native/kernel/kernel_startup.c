@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: AArch64 kernel startup — arch-specific part for kernel.resource kobj.
           The actual boot entry is in kernel_cstart.c (standalone core.elf).

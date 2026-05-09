@@ -62,10 +62,10 @@ PKG_LIBS      := aros partition utility oop graphics layers intuition keymap dos
 PKG_LIBS_ARCH := expansion
 PKG_RSRC      := misc bootloader dosboot lddemon usbromstartup FileSystem shell shellcommands mbox
 PKG_RSRC_ARCH := processor
-PKG_DEVS      := input gameport keyboard console sdcard USBHardware/usb2otg USBHardware/pcixhci Networks/genet
+PKG_DEVS      := input gameport keyboard console sdcard USBHardware/usb2otg
 PKG_DEVS_ARCH := timer
 PKG_HANDLERS  := con ram fat sfs afs
-PKG_HIDDS     := gfx inputclass mouse keyboard hiddclass vc4gfx pci-bcm2711
+PKG_HIDDS     := gfx inputclass mouse keyboard hiddclass vc4gfx
 PKG_CLASSES   := USB/hid USB/hub USB/bootmouse USB/bootkeyboard USB/massstorage
 
 #MM kernel-package-raspi-aarch64 : \
@@ -110,11 +110,8 @@ PKG_CLASSES   := USB/hid USB/hub USB/bootmouse USB/bootkeyboard USB/massstorage
 #MM kernel-hidd-mouse \
 #MM kernel-usb-poseidon \
 #MM kernel-usb-nopci \
-#MM kernel-usb-pcixhci \
 #MM kernel-usb-usb2otg-aarch64 \
 #MM kernel-usb-romstrap-raspi \
-#MM kernel-hidd-pci-bcm2711 \
-#MM workbench-devs-networks-genet-normal \
 #MM kernel-econsole
 
 %make_package mmake=kernel-package-raspi-aarch64 file=$(AROSDIR)/$(AARCH64_BSP) \

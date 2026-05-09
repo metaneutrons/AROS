@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
- *  Author: Fabian Schmieder
 
     Licensed under the AROS Public License (APL), Version 1.1.
 
@@ -66,14 +65,12 @@ extern void *malloc(size_t size);
  * TCR_EL1 fields — ARM ARM D13.2.120
  */
 #define TCR_T0SZ_36BIT      28          /* 64 - 36 = 28 → 64GB VA space */
-#define TCR_T0SZ_40BIT      24          /* 64 - 40 = 24 → 1TB VA space */
 #define TCR_TG0_4KB         (0UL << 14)
 #define TCR_SH0_INNER       (3UL << 12)
 #define TCR_ORGN0_WB_ALLOC  (1UL << 10)
 #define TCR_IRGN0_WB_ALLOC  (1UL << 8)
 #define TCR_EPD1            (1UL << 23) /* Disable TTBR1 walks */
 #define TCR_IPS_64GB        (1UL << 32) /* 36-bit PA = 64GB */
-#define TCR_IPS_1TB         (2UL << 32) /* 40-bit PA = 1TB */
 
 /* SCTLR_EL1 bits — ARM ARM D13.2.113 */
 #define SCTLR_M             (1UL << 0)  /* MMU enable */
@@ -90,16 +87,6 @@ static void *alloc_page_table(void)
     void *raw = malloc(PAGE_SIZE * 2);
     if (!raw) return (void *)0;
     return (void *)(((uintptr_t)raw + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1));
-}
-
-/* Allocate 8KB-aligned, 2-page L1 table for 40-bit VA */
-static void *alloc_l1_table_40bit(void)
-{
-    /* Allocate 3 pages to guarantee 8KB alignment within */
-    void *raw = malloc(PAGE_SIZE * 3);
-    if (!raw) return (void *)0;
-    uintptr_t aligned = ((uintptr_t)raw + (2 * PAGE_SIZE) - 1) & ~((2 * PAGE_SIZE) - 1);
-    return (void *)aligned;
 }
 
 static uint64_t block_desc(uint64_t phys, int attr, uint64_t sh)
@@ -140,31 +127,13 @@ void mmu_load(void)
 {
     unsigned int gb, mb;
 
-    /*
-     * Detect 40-bit VA need early — BCM2712 (RPi5, Cortex-A76) peripherals
-     * live at 0x107C000000 which requires >36-bit VA.
-     * With 4KB granule and 40-bit VA, L1 has 1024 entries = 8KB (2 pages),
-     * and must be 8KB-aligned.
-     */
-    int use_40bit = 0;
-    {
-        uint64_t midr;
-        __asm__ volatile("mrs %0, midr_el1" : "=r"(midr));
-        if (((midr >> 4) & 0xFFF) == 0xD0B)
-            use_40bit = 1;
-    }
-
-    if (use_40bit) {
-        l1_table = alloc_l1_table_40bit();
-    } else {
-        l1_table = alloc_page_table();
-    }
+    l1_table = alloc_page_table();
     if (!l1_table)
     {
         kprintf("[BOOT] MMU: Failed to allocate L1 table!\n");
         return;
     }
-    memset(l1_table, 0, use_40bit ? (2 * PAGE_SIZE) : PAGE_SIZE);
+    memset(l1_table, 0, PAGE_SIZE);
 
     for (gb = 0; gb < 4; gb++)
     {
@@ -194,37 +163,15 @@ void mmu_load(void)
 
     __asm__ volatile("dsb sy" ::: "memory");
 
-    /*
-     * BCM2712 (RPi5) peripherals live at 0x107C000000 (GB index 4).
-     * Extend to 40-bit VA/PA only when running on Cortex-A76 (RPi5).
-     * QEMU's raspi4b does not support 40-bit PA and will fault.
-     */
-    if (use_40bit)
-    {
-        unsigned int bcm2712_gb = 4;
-        uint64_t *l2 = alloc_page_table();
-        if (l2) {
-            memset(l2, 0, PAGE_SIZE);
-            for (mb = 0; mb < ENTRIES_PER_TABLE; mb++) {
-                uint64_t addr = (uint64_t)bcm2712_gb * L1_BLOCK_SIZE +
-                                (uint64_t)mb * L2_BLOCK_SIZE;
-                l2[mb] = block_desc(addr, ATTR_DEVICE, DESC_SH_OUTER);
-            }
-            l1_table[bcm2712_gb] = DESC_VALID | DESC_TABLE |
-                                    ((uint64_t)l2 & 0x0000FFFFFFFFF000UL);
-        }
-    }
-
     kprintf("[BOOT] MMU: L1 at %p, mem=%luMB, 4KB granule\n",
             l1_table, (unsigned long)(mem_top >> 20));
 
     /* Program system registers — ARM ARM D13.2 */
     __asm__ volatile("msr mair_el1, %0" : : "r"(MAIR_VALUE));
 
-    uint64_t tcr = (use_40bit ? TCR_T0SZ_40BIT : TCR_T0SZ_36BIT) |
-                   TCR_TG0_4KB | TCR_SH0_INNER |
+    uint64_t tcr = TCR_T0SZ_36BIT | TCR_TG0_4KB | TCR_SH0_INNER |
                    TCR_ORGN0_WB_ALLOC | TCR_IRGN0_WB_ALLOC |
-                   TCR_EPD1 | (use_40bit ? TCR_IPS_1TB : TCR_IPS_64GB);
+                   TCR_EPD1 | TCR_IPS_64GB;
     __asm__ volatile("msr tcr_el1, %0" : : "r"(tcr));
     __asm__ volatile("msr ttbr0_el1, %0" : : "r"((uint64_t)l1_table));
     __asm__ volatile("tlbi vmalle1; dsb sy; isb" ::: "memory");
@@ -235,51 +182,6 @@ void mmu_load(void)
     sctlr &= ~SCTLR_WXN;  /* Ensure writable pages are still executable */
     __asm__ volatile("msr sctlr_el1, %0" : : "r"(sctlr));
     __asm__ volatile("isb" ::: "memory");
-
-    /*
-     * CPU-specific performance tuning.
-     * These are implementation-defined registers — safe to write on
-     * Cortex-A72 (RPi4) and Cortex-A76 (RPi5), ignored on QEMU.
-     *
-     * CPUACTLR_EL1 (S3_1_C15_C2_0) — Cortex-A72:
-     *   [44]    = Disable L1 data prefetch throttling
-     *   [25:24] = L1 data prefetch control (11 = aggressive)
-     *
-     * CPUECTLR_EL1 (S3_1_C15_C2_1) — Cortex-A72/A76:
-     *   [6]     = Enable hardware prefetch of L2 to L1
-     *   [5:4]   = L2 data prefetch distance (11 = max)
-     *   [2]     = Enable L2 TLB prefetch
-     */
-    {
-        uint64_t midr;
-        __asm__ volatile("mrs %0, midr_el1" : "=r"(midr));
-        unsigned int part = (midr >> 4) & 0xFFF;
-
-        if (part == 0xD08)  /* Cortex-A72 (RPi4) */
-        {
-            uint64_t actlr, ectlr;
-            __asm__ volatile("mrs %0, S3_1_C15_C2_0" : "=r"(actlr));
-            actlr |= (1UL << 44);       /* Disable prefetch throttling */
-            actlr |= (3UL << 24);       /* Aggressive L1 data prefetch */
-            __asm__ volatile("msr S3_1_C15_C2_0, %0" : : "r"(actlr));
-
-            __asm__ volatile("mrs %0, S3_1_C15_C2_1" : "=r"(ectlr));
-            ectlr |= (1UL << 6);        /* L2-to-L1 prefetch enable */
-            ectlr |= (3UL << 4);        /* Max L2 prefetch distance */
-            ectlr |= (1UL << 2);        /* L2 TLB prefetch */
-            __asm__ volatile("msr S3_1_C15_C2_1, %0" : : "r"(ectlr));
-            __asm__ volatile("isb");
-        }
-        else if (part == 0xD0B)  /* Cortex-A76 (RPi5) */
-        {
-            uint64_t ectlr;
-            __asm__ volatile("mrs %0, S3_1_C15_C2_1" : "=r"(ectlr));
-            ectlr |= (1UL << 6);        /* L2-to-L1 prefetch enable */
-            ectlr |= (3UL << 4);        /* Max L2 prefetch distance */
-            __asm__ volatile("msr S3_1_C15_C2_1, %0" : : "r"(ectlr));
-            __asm__ volatile("isb");
-        }
-    }
 
     kprintf("[BOOT] MMU enabled\n");
 }

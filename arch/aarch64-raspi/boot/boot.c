@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2026, The AROS Development Team. All rights reserved.
-     Author: Fabian Schmieder
 
     Desc: AArch64 bootstrap for Raspberry Pi 4.
           Parses device tree, detects memory, sets up MMU,
@@ -193,19 +192,12 @@ void boot(void *dtb_ptr)
     /* Map GIC-400 area (not in /soc ranges on Pi 4) */
     mmu_map(0xFF800000UL, 0x00800000UL, 1);
 
-    {
-        of_node_t *root = dt_find_node("/");
-        of_property_t *model = root ? dt_find_property(root, "model") : (void *)0;
-        if (model && model->op_value)
-            kprintf("[BOOT] Booted on %s\n", (char *)model->op_value);
-        else
-            kprintf("[BOOT] Booted on unknown platform\n");
-    }
+    kprintf("[BOOT] Booted on %s\n",
+            (char *)dt_find_property(dt_find_node("/"), "model")->op_value);
 
     /* Set up boot tag list */
     boottag = (struct TagItem *)((uintptr_t)&__bootstrap_end + 0x1000);
     boottag = (struct TagItem *)(((uintptr_t)boottag + 15) & ~15);
-    struct TagItem *boottag_start = boottag;
 
     boottag->ti_Tag = KRN_Platform;
     boottag->ti_Data = 0x2711;
@@ -425,16 +417,13 @@ void boot(void *dtb_ptr)
                 {
                     const char *filename = remove_path((const char *)(file + 4));
                     len = AROS_BE2LONG(*(uint32_t *)file);
-                    if (len == 0 || len > 1024) { kprintf("\n[BOOT] BAD name_len=%lu\n", (unsigned long)len); break; }
                     if (cnt % 4 == 0)
                         kprintf("\n[BOOT]    %s", filename);
                     else
                         kprintf(", %s", filename);
                     file += len + 5;
-                    if (file >= file_end) break;
                     len = AROS_BE2LONG(*(uint32_t *)file);
                     file += 4;
-                    if (len == 0 || file + len > file_end) { kprintf("\n[BOOT] BAD elf_len=%lu\n", (unsigned long)len); break; }
                     loadElf(((uintptr_t)file & 7) && len <= ELF_ALIGN_BUF_SIZE
                            ? (memcpy(elf_aligned_buf, file, len), elf_aligned_buf)
                            : file);
@@ -488,8 +477,10 @@ void boot(void *dtb_ptr)
     boottag->ti_Data = 0;
 
     {
+        struct TagItem *tag_base = (struct TagItem *)((uintptr_t)&__bootstrap_end + 0x1000);
+        tag_base = (struct TagItem *)(((uintptr_t)tag_base + 15) & ~15);
         kprintf("[BOOT] Kernel tags: %d entries\n",
-                (int)((uintptr_t)boottag - (uintptr_t)boottag_start) / (int)sizeof(struct TagItem));
+                (int)((uintptr_t)boottag - (uintptr_t)tag_base) / (int)sizeof(struct TagItem));
     }
     kprintf("[BOOT] Bootstrap used %d bytes\n", (int)mem_used());
     kprintf("[BOOT] Jumping to kernel @ %p\n\n", entry);
@@ -500,7 +491,7 @@ void boot(void *dtb_ptr)
         for (;;) __asm__ volatile("wfe");
     }
 
-    entry(boottag_start);
+    entry((struct TagItem *)((uintptr_t)&__bootstrap_end + 0x1000));
 
     kprintf("[BOOT] Kernel returned! Halting.\n");
     for (;;) __asm__ volatile("wfe");
