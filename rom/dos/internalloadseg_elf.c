@@ -10,7 +10,6 @@
 #include <proto/arossupport.h>
 #include <proto/debug.h>
 #include <proto/exec.h>
-#include <proto/kernel.h>
 
 #include <aros/asmcall.h>
 #include <aros/macros.h>
@@ -35,13 +34,6 @@ struct hunk
     BPTR  next;
     char  data[0];
 } __attribute__((packed));
-
-#define HUNKF_EXEC 1
-#define HUNKF_MMAP 2  /* Allocated via KrnAllocPages, not AROS heap */
-#define HUNKF_SHIFT 30 /* Flags stored in high bits of size */
-#define HUNK_SIZE(h) ((h)->size & 0x3FFFFFFFUL)
-#define HUNK_FLAGS(h) ((h)->size >> HUNKF_SHIFT)
-#define HUNK_SET_SIZE_FLAGS(h, sz, fl) ((h)->size = ((sz) & 0x3FFFFFFFUL) | ((fl) << HUNKF_SHIFT))
 
 #define BPTR2HUNK(bptr) ((struct hunk *)((void *)bptr - offsetof(struct hunk, next)))
 #define HUNK2BPTR(hunk) MKBADDR(&hunk->next)
@@ -259,56 +251,11 @@ static int __attribute__ ((noinline)) load_hunk
         }
     }
 
-#if defined(__aarch64__)
-    /*
-     * macOS arm64 W^X: executable hunks must be on their own mmap'd pages.
-     * Allocate an extra page for the hunk header so the code pages can be
-     * mprotect'd to RX without affecting the writable header.
-     */
-    if (sh->flags & SHF_EXECINSTR)
-    {
-        APTR KernelBase = OpenResource("kernel.resource");
-        if (KernelBase)
-        {
-            ULONG pgsz = 16384;
-            /* Header on first page, code on subsequent pages */
-            ULONG alloc_size = pgsz + ((hunk_size + pgsz - 1) & ~(pgsz - 1));
-            hunk = (struct hunk *)KrnAllocPages(NULL, alloc_size, MAP_Readable | MAP_Writable);
-                bug("[ELF] KrnAllocPages(%lu) -> %p\n", (unsigned long)alloc_size, hunk);
-            if (hunk)
-            {
-                if (sh->type == SHT_NOBITS)
-                    memset(hunk, 0, alloc_size);
-                hunk->next = 0;
-                HUNK_SET_SIZE_FLAGS(hunk, alloc_size, HUNKF_MMAP);
-                /* Point data to the second page so code is page-aligned */
-                /* We'll adjust sh->addr later to skip the header page */
-                goto hunk_allocated;
-            }
-        }
-    }
-#endif
     hunk = ilsAllocMem(hunk_size, memflags | MEMF_PUBLIC | (sh->type == SHT_NOBITS ? MEMF_CLEAR : 0));
     if (hunk)
     {
         hunk->next = 0;
-        HUNK_SET_SIZE_FLAGS(hunk, hunk_size, 0);
-hunk_allocated: ;
-
-#if defined(__aarch64__)
-        /* For mmap'd executable hunks, code goes on the second page.
-         * Write a FullJumpVec (data pointer) at hunk->data so that
-         * __AROS_SEG_ENTRY can find the actual code address. */
-        if (HUNK_FLAGS(hunk) & HUNKF_MMAP)
-        {
-            IPTR pgsz = 16384;
-            sh->addr = (char *)(((IPTR)hunk + pgsz) & ~(pgsz - 1));
-            if (do_align && sh->addralign > 1)
-                sh->addr = (char *)AROS_ROUNDUP2((IPTR)sh->addr, sh->addralign);
-            __AROS_SET_FULLJMP((struct FullJumpVec *)hunk->data, sh->addr);
-            goto hunk_addr_set;
-        }
-#endif
+        hunk->size = hunk_size;
 
         /* In case we are required to honour alignment, and If this section contains
            executable code, create a trampoline to its beginning, so that even if the
@@ -318,28 +265,17 @@ hunk_allocated: ;
         {
             if (sh->flags & SHF_EXECINSTR)
             {
-#if defined(HOST_OS_darwin) && defined(__aarch64__)
-                /*
-                 * macOS arm64 W^X: we cannot write executable code to RAM.
-                 * Skip the FullJumpVec trampoline and point directly to the
-                 * aligned code. The segment entry point is the code itself.
-                 */
-                sh->addr = (char *)AROS_ROUNDUP2((IPTR)hunk->data, sh->addralign);
-#else
                 sh->addr = (char *)AROS_ROUNDUP2
                 (
                     (IPTR)hunk->data + sizeof(struct FullJumpVec), sh->addralign
                 );
                 __AROS_SET_FULLJMP((struct FullJumpVec *)hunk->data, sh->addr);
-#endif
             }
             else
                 sh->addr = (char *)AROS_ROUNDUP2((IPTR)hunk->data, sh->addralign);
         }
         else
             sh->addr = hunk->data;
-
-hunk_addr_set: ;
 
         /* Link the previous one with the new one */
         BPTR2HUNK(*next_hunk_ptr)->next = HUNK2BPTR(hunk);
@@ -375,14 +311,7 @@ static int relocate
     struct sheader *toreloc  = &sh[shrel->info];
 
     struct symbol *symtab   = (struct symbol *)shsymtab->addr;
-    UBYTE         *relbase  = (UBYTE *)shrel->addr;
-    /*
-     * Some toolchains emit SHT_REL (8-byte: offset+info, addend in the
-     * field) while others emit SHT_RELA (12-byte: offset+info+addend).
-     */
-#if defined(__arm__)
-    BOOL is_rela = (shrel->type == SHT_RELA);
-#endif
+    struct relo   *rel      = (struct relo *)shrel->addr;
 
     /*
      * Ignore relocs if the target section has no allocation. that can happen
@@ -392,34 +321,7 @@ static int relocate
         return 1;
 
     ULONG numrel = shrel->size / shrel->entsize;
-    ULONG entsize = shrel->entsize;
     ULONG i;
-#if defined(__aarch64__)
-    /*
-     * AArch64 GOT synthesis: the compiler emits GOT-indirect accesses for
-     * weak/extern symbols (R_AARCH64_ADR_GOT_PAGE + R_AARCH64_LD64_GOT_LO12_NC).
-     * Since relocatable ELFs have no .got section, we synthesize one here.
-     * Count GOT entries needed, allocate a buffer, and fill it during relocation.
-     */
-    IPTR *got_entries = NULL;
-    ULONG got_count = 0;
-    ULONG got_alloc = 0;
-    {
-        struct relo *scan = (struct relo *)shrel->addr;
-        for (i = 0; i < numrel; i++, scan++)
-            if (ELF_R_TYPE(scan->info) == R_AARCH64_ADR_GOT_PAGE)
-                got_alloc++;
-    }
-    if (got_alloc > 0)
-    {
-        got_entries = AllocVec(got_alloc * sizeof(IPTR), MEMF_PUBLIC | MEMF_CLEAR);
-        if (!got_entries)
-        {
-            SetIoErr(ERROR_NO_FREE_STORE);
-            return 0;
-        }
-    }
-#endif
 #if defined(__i386__) || defined(__x86_64__)
     IPTR got_base = 0;
 
@@ -432,9 +334,8 @@ static int relocate
     }
 #endif
 
-    for (i=0; i<numrel; i++)
+    for (i=0; i<numrel; i++, rel++)
     {
-        struct relo *rel = (struct relo *)(relbase + i * entsize);
         struct symbol *sym;
         ULONG *p;
         IPTR s;
@@ -632,17 +533,7 @@ static int relocate
             case R_ARM_JUMP24:
             case R_ARM_PC24:
             {
-                LONG addend;
-                if (is_rela) {
-                    addend = (LONG)((struct rela *)rel)->addend;
-                } else {
-                    /* SHT_REL: 24-bit signed offset (in units of 4 bytes)
-                     * encoded in the BL/B instruction's low 24 bits. */
-                    addend = (LONG)((*p & 0x00FFFFFFu) << 2);
-                    if (addend & 0x02000000)
-                        addend -= 0x04000000;
-                }
-                LONG temp = (LONG)(addend + s - (IPTR)p);
+                LONG temp = (LONG)(rel->addend + s - (IPTR)p);
 
                 if (temp & 3) {
                     kprintf("[ELF Loader] CALL/JUMP24/PC24 unaligned\n");
@@ -664,15 +555,7 @@ static int relocate
 
             case R_ARM_PREL31:
             {
-                LONG addend;
-                if (is_rela) {
-                    addend = (LONG)((struct rela *)rel)->addend;
-                } else {
-                    /* SHT_REL: 31-bit signed offset stored in the low 31
-                     * bits of the field; bit 31 is the cantUnwind flag. */
-                    addend = (LONG)(*p << 1) >> 1;
-                }
-                LONG temp = (LONG)(addend + s - (IPTR)p);
+                LONG temp = (LONG)(rel->addend + s - (IPTR)p);
 
                 // Range check for signed 31 bits.
                 if (temp < -(1<<30) || temp > ((1<<30)-1)) {
@@ -769,23 +652,7 @@ static int relocate
             case R_ARM_MOVW_ABS_NC:
             case R_ARM_MOVT_ABS:
             {
-                LONG addend;
-                if (is_rela) {
-                    addend = (LONG)((struct rela *)rel)->addend;
-                } else {
-                    /* SHT_REL: 16-bit immediate is encoded split (bits
-                     * 19:16 hold imm4, 11:0 hold imm12). For MOVT this
-                     * is the upper half of the addend; for MOVW the lower.
-                     * Treat the 16-bit value as unsigned when reassembling
-                     * the full 32-bit addend so MOVT/MOVW pairs combine
-                     * correctly. */
-                    ULONG imm16 = ((*p & 0x000F0000u) >> 4) | (*p & 0x00000FFFu);
-                    if (ELF_R_TYPE(rel->info) == R_ARM_MOVT_ABS)
-                        addend = (LONG)(imm16 << 16);
-                    else
-                        addend = (LONG)imm16;
-                }
-                ULONG temp = (ULONG)s + (ULONG)addend;
+                ULONG temp = (ULONG)s + (ULONG)rel->addend;
 
                 // Select the 16-bit half to encode.
                 ULONG imm16 = (ELF_R_TYPE(rel->info) == R_ARM_MOVT_ABS)
@@ -804,117 +671,12 @@ static int relocate
             case R_ARM_TARGET1: /* use for constructors/destructors; maps to
                                    R_ARM_ABS32 */
             case R_ARM_ABS32:
-                if (is_rela)
-                    *p = (ULONG)((struct rela *)rel)->addend + s;
-                else
-                    *p = *p + s;  /* SHT_REL: addend is in *p */
+                *p = rel->addend + s;
                 break;
 
             case R_ARM_NONE:
                 break;
             #elif defined(__aarch64__)
-
-            case R_AARCH64_ABS64:
-                *(UQUAD *)p = rel->addend + s;
-                break;
-
-            case R_AARCH64_ABS32:
-                *(ULONG *)p = (ULONG)(rel->addend + s);
-                break;
-
-            case R_AARCH64_PREL32:
-                *(LONG *)p = (LONG)(rel->addend + s - (IPTR)p);
-                break;
-
-            case R_AARCH64_CALL26:
-            case R_AARCH64_JUMP26:
-            {
-                LONG offset = (LONG)(rel->addend + s - (IPTR)p);
-                offset >>= 2;
-                *(ULONG *)p = (*(ULONG *)p & 0xFC000000) | (offset & 0x03FFFFFF);
-                break;
-            }
-
-            case R_AARCH64_ADR_PREL_PG_HI21:
-            {
-                QUAD offset = (QUAD)((rel->addend + s) & ~0xFFF) - ((IPTR)p & ~0xFFF);
-                LONG imm = (LONG)(offset >> 12);
-                ULONG immlo = (imm & 3) << 29;
-                ULONG immhi = ((imm >> 2) & 0x7FFFF) << 5;
-                *(ULONG *)p = (*(ULONG *)p & 0x9F00001F) | immlo | immhi;
-                break;
-            }
-
-            case R_AARCH64_ADD_ABS_LO12_NC:
-            case R_AARCH64_LDST8_ABS_LO12_NC:
-            {
-                ULONG imm12 = (ULONG)((rel->addend + s) & 0xFFF);
-                *(ULONG *)p = (*(ULONG *)p & 0xFFC003FF) | (imm12 << 10);
-                break;
-            }
-
-            case R_AARCH64_LDST16_ABS_LO12_NC:
-            {
-                ULONG imm12 = (ULONG)(((rel->addend + s) & 0xFFF) >> 1);
-                *(ULONG *)p = (*(ULONG *)p & 0xFFC003FF) | (imm12 << 10);
-                break;
-            }
-
-            case R_AARCH64_LDST32_ABS_LO12_NC:
-            {
-                ULONG imm12 = (ULONG)(((rel->addend + s) & 0xFFF) >> 2);
-                *(ULONG *)p = (*(ULONG *)p & 0xFFC003FF) | (imm12 << 10);
-                break;
-            }
-
-            case R_AARCH64_LDST64_ABS_LO12_NC:
-            {
-                ULONG imm12 = (ULONG)(((rel->addend + s) & 0xFFF) >> 3);
-                *(ULONG *)p = (*(ULONG *)p & 0xFFC003FF) | (imm12 << 10);
-                break;
-            }
-
-            case R_AARCH64_LDST128_ABS_LO12_NC:
-            {
-                ULONG imm12 = (ULONG)(((rel->addend + s) & 0xFFF) >> 4);
-                *(ULONG *)p = (*(ULONG *)p & 0xFFC003FF) | (imm12 << 10);
-                break;
-            }
-
-            case R_AARCH64_ADR_GOT_PAGE:
-            {
-                /*
-                 * GOT-indirect page relocation: adrp Xd, :got:sym
-                 * Allocate a GOT slot, store the symbol address in it,
-                 * and patch the adrp to point to the GOT slot's page.
-                 */
-                IPTR *got_slot = &got_entries[got_count++];
-                *got_slot = rel->addend + s;
-                IPTR got_addr = (IPTR)got_slot;
-                QUAD offset = (QUAD)(got_addr & ~0xFFF) - ((IPTR)p & ~0xFFF);
-                LONG imm = (LONG)(offset >> 12);
-                ULONG immlo = (imm & 3) << 29;
-                ULONG immhi = ((imm >> 2) & 0x7FFFF) << 5;
-                *(ULONG *)p = (*(ULONG *)p & 0x9F00001F) | immlo | immhi;
-                break;
-            }
-
-            case R_AARCH64_LD64_GOT_LO12_NC:
-            {
-                /*
-                 * GOT-indirect low12 relocation: ldr Xd, [Xn, :got_lo12:sym]
-                 * The preceding ADR_GOT_PAGE already created the GOT slot.
-                 * Patch the ldr offset to point to the GOT slot within its page.
-                 * got_count-1 because ADR_GOT_PAGE already incremented it.
-                 */
-                IPTR got_addr = (IPTR)&got_entries[got_count - 1];
-                ULONG imm12 = (ULONG)((got_addr & 0xFFF) >> 3);
-                *(ULONG *)p = (*(ULONG *)p & 0xFFC003FF) | (imm12 << 10);
-                break;
-            }
-
-            case R_AARCH64_NONE:
-                break;
 
             #elif defined(__riscv)
 
@@ -1268,12 +1030,8 @@ BPTR InternalLoadSeg_ELF
     /* Relocate the sections */
     for (i = 0; i < int_shnum; i++)
     {
-        /* Does this relocation section refer to a hunk? If so, addr must be != 0.
-         * Accept both SHT_REL and SHT_RELA: the actual section type produced by
-         * a given toolchain is not fixed (e.g. clang/lld emits SHT_REL for ARM
-         * 32-bit while some gcc builds emit SHT_RELA).
-         */
-        if ((sh[i].type == SHT_REL || sh[i].type == SHT_RELA) && sh[sh[i].info].addr)
+        /* Does this relocation section refer to a hunk? If so, addr must be != 0 */
+        if ((sh[i].type == AROS_ELF_REL) && sh[sh[i].info].addr)
         {
             sh[i].addr = load_block(file, sh[i].offset, sh[i].size, funcarray, &srb, DOSBase);
             if (!sh[i].addr || !relocate(&eh, sh, i, symtab_shndx, DOSBase))
@@ -1304,27 +1062,7 @@ end:
     {
         struct hunk *hunk = BPTR2HUNK(BADDR(curr));
 
-        ils_ClearCache(hunk->data, HUNK_SIZE(hunk), CACRF_ClearD | CACRF_ClearI);
-
-#if defined(__aarch64__)
-        /* macOS arm64 W^X: make mmap'd executable hunks read+execute.
-         * Only mprotect the code portion (hunk->data), not the header. */
-        if (HUNK_FLAGS(hunk) & HUNKF_MMAP)
-        {
-            APTR KernelBase = OpenResource("kernel.resource");
-            if (KernelBase)
-            {
-                /* Code starts on the second page (first page is the header) */
-                IPTR pgsz = 16384;
-                void *code_page = (void *)(((IPTR)hunk + pgsz) & ~(pgsz - 1));
-                IPTR code_len = (IPTR)hunk + HUNK_SIZE(hunk) - (IPTR)code_page;
-                if (code_len > 0)
-                    KrnSetProtection(code_page, code_len,
-                                     MAP_Readable | MAP_Executable);
-            }
-        }
-#endif
-
+        ils_ClearCache(hunk->data, hunk->size, CACRF_ClearD | CACRF_ClearI);
         curr = hunk->next;
     }
 #endif
