@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 1995-2026, The AROS Development Team. All rights reserved.
+    Copyright (C) 1995-2025, The AROS Development Team. All rights reserved.
 
     Print the library magic and init code in the file modname_start.c.
     This code is partly based on code in CLib37x.lha from Andreas R. Kleinert
@@ -692,12 +692,10 @@ static void writeresident(FILE *out, struct config *cfg)
         switch (cfg->modtype)
         {
         case LIBRARY:
-        case CLASS:
         case MUI:
         case MCC:
         case MCP:
         case GADGET:
-        case IMAGE:
         case DATATYPE:
         case USBCLASS:
         case HIDD:
