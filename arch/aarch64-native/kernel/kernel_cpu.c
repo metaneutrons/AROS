@@ -247,8 +247,9 @@ void cpu_Dispatch(regs_t *regs)
      * and restore this task's state on demand.
      * Skip if this task already owns the FPU (common case: same task re-dispatched).
      */
-    if (task != TLS_GET(FPUOwner))
-        fpu_disable();
+    // TODO: Lazy FPU disabled - trap handler needs fixing
+    // if (task != TLS_GET(FPUOwner))
+    //         fpu_disable();
 }
 
 #if defined(__AROSEXEC_SMP__)
