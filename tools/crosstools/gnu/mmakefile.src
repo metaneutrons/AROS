@@ -309,6 +309,7 @@ crosstools-gcc-KERNEL_CFLAGS := $(CFLAGS_FOR_TARGET) $(TARGET_ISA_CFLAGS)
 
 #MM
 tools-crosstools-gcc :
+	fi
 	$(IF) ! $(TEST) -f $(gcc-installflag) ; then \
 	    $(MAKE) -C $(HOSTGENDIR)/$(CURDIR)/gcc all-gcc $(crosstools-gcc-make-env) \
 	    && $(MAKE) -j1 -C $(HOSTGENDIR)/$(CURDIR)/gcc install-gcc $(crosstools-gcc-install-env) \
