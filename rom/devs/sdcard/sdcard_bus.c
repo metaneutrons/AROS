@@ -432,7 +432,7 @@ BOOL FNAME_SDCBUS(RegisterUnit)(struct sdcard_Bus *bus)
                             pp[DE_RESERVEDBLKS + 4]     = 2;
                             pp[DE_LOWCYL       + 4]     = 0;
                             pp[DE_NUMBUFFERS   + 4]     = 10;
-                            pp[DE_BUFMEMTYPE   + 4]     = MEMF_PUBLIC | MEMF_31BIT;
+                            pp[DE_BUFMEMTYPE   + 4]     = MEMF_PUBLIC;
                             pp[DE_MAXTRANSFER  + 4]     = 0x00200000;
                             pp[DE_MASK         + 4]     = 0x7FFFFFFE;
                             pp[DE_BOOTPRI      + 4]     = 0;
