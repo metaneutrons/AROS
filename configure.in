@@ -1711,13 +1711,6 @@ case "$target_os" in
                 aros_macosx_version="10.6"
                 aros_config_cflags="$aros_config_cflags $""(CFLAGS_NO_OMIT_FP)"
                 aros_config_cxxflags="$aros_config_cxxflags $""(CFLAGS_NO_OMIT_FP)"
-                if test "$aros_host_cpu" = "aarch64" ; then
-                    aros_kernel_isa_flags="-arch x86_64"
-                    aros_kernel_ldflags="-arch x86_64"
-                else
-                    aros_kernel_isa_flags="-m64"
-                    aros_kernel_ldflags="-m64"
-                fi
                 aros_nominal_depth=8
                 aros_kernel_rs="$toolchain_ar"
                 aros_kernel_ar_flags="-cr"
@@ -2973,11 +2966,6 @@ if test "$aros_host_cpu" == "x86_64" ; then
 fi
 
 dnl Apple Clang on arm64 macOS can produce x86_64 binaries via -arch x86_64.
-if test "$aros_host_cpu" == "aarch64" ; then
-    if test "$aros_target_cpu" == "x86_64" ; then
-        if test "$aros_host_arch" == "darwin" ; then
-            cross_compiling=no
-        fi
     fi
 fi
 
