@@ -38,7 +38,7 @@
 #define FNAME_SDCIO(x)                  SDCARD__SDIO__ ## x
 
 #define SDCARD_BUSTASKPRI               10
-#define SDCARD_BUSTASKSTACK             (16384 * 4)
+#define SDCARD_BUSTASKSTACK             16384
 
 #define V200_MAXCLKDIV                  256
 #define V300_MAXCLKDIV                  2046

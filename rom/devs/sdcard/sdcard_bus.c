@@ -103,11 +103,9 @@ BOOL FNAME_SDCBUS(StartUnit)(struct sdcard_Unit *sdcUnit)
 
         if (sdcUnit->sdcu_Flags & AF_Card_MMC)
         {
-            if (sdcUnit->sdcu_Flags & AF_Card_HS200)
-                FNAME_SDCBUS(SetClock)(200000000, sdcUnit->sdcu_Bus);
-            else if (sdcUnit->sdcu_Flags & AF_Card_HighSpeed)
+            if (sdcUnit->sdcu_Flags & AF_Card_HighSpeed)
             {
-                if (sdcUnit->sdcu_Flags & AF_Card_HighSpeed52)
+                if (sdcUnit->sdcu_Flags & AB_Card_HighSpeed52)
                     FNAME_SDCBUS(SetClock)(52000000, sdcUnit->sdcu_Bus);
                 else
                     FNAME_SDCBUS(SetClock)(26000000, sdcUnit->sdcu_Bus);
@@ -432,7 +430,7 @@ BOOL FNAME_SDCBUS(RegisterUnit)(struct sdcard_Bus *bus)
                             pp[DE_RESERVEDBLKS + 4]     = 2;
                             pp[DE_LOWCYL       + 4]     = 0;
                             pp[DE_NUMBUFFERS   + 4]     = 10;
-                            pp[DE_BUFMEMTYPE   + 4]     = MEMF_PUBLIC;
+                            pp[DE_BUFMEMTYPE   + 4]     = MEMF_PUBLIC | MEMF_31BIT;
                             pp[DE_MAXTRANSFER  + 4]     = 0x00200000;
                             pp[DE_MASK         + 4]     = 0x7FFFFFFE;
                             pp[DE_BOOTPRI      + 4]     = 0;
@@ -801,79 +799,6 @@ ULONG FNAME_SDCBUS(FinishData)(struct TagItem *DataTags, struct sdcard_Bus *bus)
 
     if (sdData)
     {
-        /*
-         * ADMA2 DMA transfer if controller supports it and buffer is aligned.
-         * ADMA2 uses a descriptor table in memory — the controller DMAs
-         * directly to/from the target buffer without CPU involvement.
-         */
-        BOOL useDMA = FALSE;
-        volatile ULONG *adma_desc = NULL;
-        if ((bus->sdcb_Capabilities & SDHCI_CAN_DO_ADMA2) &&
-            (((IPTR)sdData & 3) == 0) && (sdDataLen >= 4))
-        {
-            /* Allocate DMA-safe descriptor (physical <2GB, cache-coherent) */
-            adma_desc = (volatile ULONG *)AllocMem(32, MEMF_PUBLIC | MEMF_CLEAR | MEMF_31BIT);
-            if (adma_desc)
-            {
-                adma_desc[0] = (0x21 | (sdDataLen << 16));  /* Valid + End + Act=Tran + Length */
-                adma_desc[1] = (ULONG)(IPTR)sdData;          /* 32-bit buffer address */
-
-                CacheClearE((APTR)adma_desc, 8, CACRF_ClearD);
-
-                /* Set ADMA2 mode in Host Control */
-                UBYTE hctrl = bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, bus);
-                hctrl &= ~SDHCI_HCTRL_DMA_MASK;
-                hctrl |= SDHCI_HCTRL_ADMA32;
-                bus->sdcb_IOWriteByte(SDHCI_HOST_CONTROL, hctrl, bus);
-
-                /* Write descriptor address */
-                bus->sdcb_IOWriteLong(SDHCI_ADMA_ADDRESS, (ULONG)(IPTR)adma_desc, bus);
-
-                useDMA = TRUE;
-                DTRANS(bug("[SDBus%02u] %s: ADMA2 %s %d bytes @ %p\n",
-                           bus->sdcb_BusNum, __PRETTY_FUNCTION__,
-                           (sdDataMode == MMC_DATA_READ) ? "read" : "write",
-                           sdDataLen, (void *)sdData));
-            }
-        }
-
-        if (useDMA)
-        {
-            /* DMA path: wait for transfer complete or error */
-            DTRANS(bug("[SDBus%02u] %s: Waiting for DMA completion\n", bus->sdcb_BusNum, __PRETTY_FUNCTION__));
-            do {
-                bus->sdcb_BusStatus = bus->sdcb_IOReadLong(SDHCI_INT_STATUS, bus);
-                if (bus->sdcb_BusStatus & SDHCI_INT_ERROR) {
-                    bug("[SDBus%02u] %s: DMA Error [status 0x%X]!\n",
-                        bus->sdcb_BusNum, __PRETTY_FUNCTION__, bus->sdcb_BusStatus);
-                    retVal = -1;
-                    break;
-                }
-                if (bus->sdcb_BusStatus & SDHCI_INT_ADMA_ERROR) {
-                    bug("[SDBus%02u] %s: ADMA Error [0x%02x]!\n",
-                        bus->sdcb_BusNum, __PRETTY_FUNCTION__,
-                        bus->sdcb_IOReadLong(SDHCI_ADMA_ERROR, bus));
-                    retVal = -1;
-                    break;
-                }
-                if (bus->sdcb_BusStatus & SDHCI_INT_DATA_END)
-                    break;
-                sdcard_Udelay(100);
-                if (timeout-- <= 0) {
-                    bug("[SDBus%02u] %s: DMA Timeout!\n", bus->sdcb_BusNum, __PRETTY_FUNCTION__);
-                    retVal = -1;
-                    break;
-                }
-            } while (1);
-            /* Clear DMA interrupt */
-            bus->sdcb_IOWriteLong(SDHCI_INT_STATUS, SDHCI_INT_DMA_END | SDHCI_INT_DATA_END, bus);
-            sdDataLen = 0;
-            if (adma_desc)
-                FreeMem((APTR)adma_desc, 32);
-        }
-        else
-        {
-        /* PIO fallback path */
         DTRANS(bug("[SDBus%02u] %s: Transfering CMD %02d Data..\n", bus->sdcb_BusNum, __PRETTY_FUNCTION__, sdCommand));
         do {
             bus->sdcb_BusStatus = bus->sdcb_IOReadLong(SDHCI_INT_STATUS, bus);
@@ -918,7 +843,6 @@ ULONG FNAME_SDCBUS(FinishData)(struct TagItem *DataTags, struct sdcard_Bus *bus)
                 }
             }
         } while ((sdDataLen > 0) && (!(bus->sdcb_BusStatus & SDHCI_INT_DATA_END)));
-        } /* end PIO else block */
 
         if (bus->sdcb_LEDCtrl)
             bus->sdcb_LEDCtrl(LED_OFF);

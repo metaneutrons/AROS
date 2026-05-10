@@ -71,62 +71,9 @@ ULONG FNAME_SDCUNIT(MMCChangeFrequency)(struct sdcard_Unit *sdcUnit)
 
     D(bug("[SDCard%02ld] %s: CardType = %d\n", sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__, sdcCardType));
 
-    /*
-     * Try HS200 first (200MHz, 1.8V) if card supports it.
-     * HS200 requires: card supports it (EXT_CSD[196] bit 4) AND
-     * no card-detect pin (eMMC is soldered, no CD).
-     * On BCM2712 (CM5) eMMC always runs at 1.8V I/O — no voltage switch needed.
-     */
-    if ((sdcCardType & MMC_HS200_1V8) &&
-        !(sdcUnit->sdcu_Bus->sdcb_IOReadLong(SDHCI_PRESENT_STATE, sdcUnit->sdcu_Bus) & SDHCI_PS_CARD_DETECT_PIN_LVL))
+    if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_HS_TIMING, 1, sdcUnit) != -1)
     {
-        D(bug("[SDCard%02ld] %s: Card supports HS200, attempting switch\n",
-              sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
-
-        /* Set bus width to 8-bit if controller supports it, else 4-bit */
-        if (sdcUnit->sdcu_Bus->sdcb_Capabilities & SDHCI_CAN_DO_8BIT)
-        {
-            if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_8, sdcUnit) != -1)
-            {
-                UBYTE hostCtrl = sdcUnit->sdcu_Bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, sdcUnit->sdcu_Bus);
-                hostCtrl |= SDHCI_HCTRL_8BITBUS;
-                sdcUnit->sdcu_Bus->sdcb_IOWriteByte(SDHCI_HOST_CONTROL, hostCtrl, sdcUnit->sdcu_Bus);
-                sdcUnit->sdcu_Flags |= AF_Card_4bitData;  /* implies wide bus */
-                D(bug("[SDCard%02ld] %s: 8-bit bus width enabled\n",
-                      sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
-            }
-        }
-        else if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_4, sdcUnit) != -1)
-        {
-            UBYTE hostCtrl = sdcUnit->sdcu_Bus->sdcb_IOReadByte(SDHCI_HOST_CONTROL, sdcUnit->sdcu_Bus);
-            hostCtrl |= SDHCI_HCTRL_4BITBUS;
-            sdcUnit->sdcu_Bus->sdcb_IOWriteByte(SDHCI_HOST_CONTROL, hostCtrl, sdcUnit->sdcu_Bus);
-            sdcUnit->sdcu_Flags |= AF_Card_4bitData;
-        }
-
-        /* Switch to HS200 timing */
-        if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_HS_TIMING, EXT_CSD_HS_TIMING_HS200, sdcUnit) != -1)
-        {
-            /* Set UHS mode in HOST_CONTROL2 */
-            UWORD ctrl2 = sdcUnit->sdcu_Bus->sdcb_IOReadWord(SDHCI_HOST_CONTROL2, sdcUnit->sdcu_Bus);
-            ctrl2 &= ~SDHCI_CTRL2_UHS_MASK;
-            ctrl2 |= SDHCI_CTRL2_HS200;
-            sdcUnit->sdcu_Bus->sdcb_IOWriteWord(SDHCI_HOST_CONTROL2, ctrl2, sdcUnit->sdcu_Bus);
-
-            sdcUnit->sdcu_Flags |= AF_Card_HighSpeed | AF_Card_HS200;
-
-            D(bug("[SDCard%02ld] %s: HS200 mode enabled\n",
-                  sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
-            return 0;
-        }
-        D(bug("[SDCard%02ld] %s: HS200 switch failed, falling back to HS\n",
-              sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
-    }
-
-    /* Fallback: standard High-Speed (26/52 MHz) */
-    if (FNAME_SDCUNIT(MMCSwitch)(EXT_CSD_HS_TIMING, EXT_CSD_HS_TIMING_HS, sdcUnit) == -1)
-    {
-        D(bug("[SDCard%02ld] %s: HS switch failed\n", sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
+        D(bug("[SDCard%02ld] %s: Switch failed\n", sdcUnit->sdcu_UnitNum, __PRETTY_FUNCTION__));
         return -1;
     }
 
