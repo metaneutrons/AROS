@@ -2699,20 +2699,3 @@ diff -ruN gcc-15.2.0/libstdc++-v3/include/std/ratio gcc-15.2.0.aros/libstdc++-v3
        static constexpr int __shift = __builtin_clzll(__d);
        static constexpr int __coshift_ = sizeof(uintmax_t) * 8 - __shift;
        static constexpr int __coshift = (__shift != 0) ? __coshift_ : 0;
-
-
-
-
-
-
---- a/Makefile.in
-+++ b/Makefile.in
-@@ -152,7 +152,7 @@
- # built for the build system to override those in BASE_FLAGS_TO_PASS.
- EXTRA_BUILD_FLAGS = \
- 	CFLAGS="$(CFLAGS_FOR_BUILD)" \
--	LDFLAGS="$(LDFLAGS_FOR_BUILD)"
-+	LDFLAGS="$(LDFLAGS_FOR_BUILD)" \
-+	CXXFLAGS="$(CXXFLAGS_FOR_BUILD) -fno-char8_t"
- 
- # This is the list of directories to built for the host system.
