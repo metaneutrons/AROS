@@ -55,6 +55,7 @@ ifneq (,$(findstring arm,$(AROS_TARGET_CPU)))
 #GCC_COMMON_OPTS += --with-mode=$(GCC_DEFAULT_MODE)
 GCC_COMMON_OPTS += --disable-libunwind-exceptions
 GCC_COMMON_OPTS += --disable-libstdcxx-verbose
+GCC_COMMON_OPTS += --disable-libatomic --disable-libstdcxx-pch
 GCC_COMMON_OPTS += --enable-multilib
 LIBATOMIC_OPTS += --disable-multilib
 
@@ -309,7 +310,6 @@ crosstools-gcc-KERNEL_CFLAGS := $(CFLAGS_FOR_TARGET) $(TARGET_ISA_CFLAGS)
 
 #MM
 tools-crosstools-gcc :
-	fi
 	$(IF) ! $(TEST) -f $(gcc-installflag) ; then \
 	    $(MAKE) -C $(HOSTGENDIR)/$(CURDIR)/gcc all-gcc $(crosstools-gcc-make-env) \
 	    && $(MAKE) -j1 -C $(HOSTGENDIR)/$(CURDIR)/gcc install-gcc $(crosstools-gcc-install-env) \
@@ -325,8 +325,8 @@ tools-crosstools-gcc :
 
 #MM tools-crosstools-gcc : crosstools-gcc--fetch crosstools-gcc--configure
 
-#MM tools-crosstools-gcc-libatomic : crosstools-gcc--fetch tools-crosstools-autolibs linklibs-$(AROS_TARGET_CPU)
-#MM- linklibs-gnu-libatomic : tools-crosstools-gcc-libatomic
+#DISABLED-MM tools-crosstools-gcc-libatomic : crosstools-gcc--fetch tools-crosstools-autolibs linklibs-$(AROS_TARGET_CPU)
+#DISABLED-MM- linklibs-gnu-libatomic : tools-crosstools-gcc-libatomic
 
 %fetch_and_build mmake=crosstools-gcc package=gcc version=$(GCC_VERSION) compiler=host \
 	package_repo="$(GCC_REPOSITORY)" suffixes="tar.xz tar.bz2 tar.gz" \
@@ -359,5 +359,5 @@ LIBATOMIC_SRCDIR := $(HOSTDIR)/Ports/host/gcc/gcc-$(GCC_VERSION)/libatomic
 ifeq ($(AROS_TARGET_CPU),m68k)
 ISA_FLAGS:=$(ISA_FLOAT_FLAGS)
 endif
-%build_with_configure mmake=tools-crosstools-gcc-libatomic srcdir="$(LIBATOMIC_SRCDIR)" \
-	basedir= gendir="$(LIBATOMIC_OBJDIR)" extraoptions="$(LIBATOMIC_OPTS)" install_env="$(LIBATOMIC_ENV)"
+#DISABLED %build_with_configure mmake=tools-crosstools-gcc-libatomic srcdir="$(LIBATOMIC_SRCDIR)" \
+#DISABLED 	basedir= gendir="$(LIBATOMIC_OBJDIR)" extraoptions="$(LIBATOMIC_OPTS)" install_env="$(LIBATOMIC_ENV)"
